@@ -1,0 +1,20 @@
+- [x] 评价标签从22个扩展为约40个，覆盖乐高搭建/机器人编程/代码编程/通用能力四类
+- [x] strength/improvement/weakness 三类标签无语义重叠，维度互补
+- [x] AI Prompt 根据课程类型（theme）动态切换，包含领域特定知识
+- [x] 乐高搭建类Prompt侧重空间建构、结构设计、动手操作
+- [x] 机器人编程类Prompt侧重软硬件联动、传感器应用、编程逻辑
+- [x] 代码编程类Prompt侧重代码能力、算法思维、项目设计
+- [x] 教学主题从8个扩展为约14个，包含积木搭建、机器人竞赛、游戏设计等
+- [x] 课程阶段新增小颗粒积木系列（2阶段）
+- [x] BricQ拆分为2阶段（beginner/intermediate）
+- [x] WEDO2.0拆分为2阶段（beginner/intermediate）
+- [x] THEME_OPTIONS 包含"小颗粒"选项
+- [x] feedbacks 表有 work_info JSONB 字段存储作品信息
+- [x] feedbacks 表有 ability_scores JSONB 字段存储能力评分
+- [x] 照片上传支持裁剪功能（自由裁剪 + 1:1/4:3/16:9比例）
+- [x] 已上传照片支持替换和删除
+- [x] 学员风采使用网格布局（3列），间距统一，尺寸一致
+- [x] 导出模板不修改原有结构，仅增加学员风采部分
+- [x] TypeScript 类型检查通过
+- [x] ESLint 检查通过
+- [x] Next.js 构建通过

@@ -1,0 +1,21 @@
+- [ ] 公共 AI 模块 ai-client.ts 已创建，getAISettings/streamThirdPartyAI 统一导出
+- [ ] 3 个 AI route.ts 已更新引用公共模块
+- [ ] 复检时扣子AI传入 system Prompt
+- [ ] 自定义标签分类使用实际 category 而非硬编码 strength
+- [ ] AI 设置 PUT 接口字段名与前端一致 + 掩码值跳过更新
+- [ ] 重置 Prompt 调用 getDefaultPrompt()
+- [ ] SSE 后端 buffer 机制按 \n\n 分割完整事件
+- [ ] SSE 前端 buffer 机制按 \n\n 分割完整事件
+- [ ] AI 流式调用添加 120s 超时
+- [ ] AI 非流式调用添加 30s 超时
+- [ ] 前端 SSE 添加 120s 无数据超时
+- [ ] generate/review/parse 路由添加 Zod 输入校验
+- [ ] 用户输入转义防 Prompt 注入
+- [ ] 领域 Prompt 补充【总结】部分
+- [ ] getDomainPrompt 匹配优先级优化
+- [ ] 自定义 Prompt 与领域 Prompt 合并策略
+- [ ] AI 流式对话框 Markdown 渲染
+- [ ] AI 流式对话框取消按钮
+- [ ] TypeScript 类型检查通过
+- [ ] ESLint 检查通过
+- [ ] Next.js 构建通过

@@ -1,0 +1,14 @@
+- [x] JWT Secret 在生产环境缺失时拒绝启动（src/lib/auth.ts）
+- [x] 创建教师/用户时密码使用 bcrypt 哈希存储（teachers/route.ts, users/route.ts）
+- [x] 更新用户密码时使用 bcrypt 哈希存储（users/[id]/route.ts）
+- [x] 源码中无硬编码明文密码和手机号（data/import, data/full-import, batch-import）
+- [x] Middleware 保护前端路由 + 角色权限校验（src/middleware.ts）
+- [x] 登录接口仅支持 bcrypt 密码比对，移除明文兼容（auth/login/route.ts）
+- [x] page.tsx useRouter 导入正确（src/app/page.tsx）
+- [x] docker-compose.yml 包含 JWT_SECRET 环境变量
+- [x] 所有 PUT 路由使用 Zod schema 校验输入
+- [x] API 错误响应格式统一，生产环境不暴露内部错误详情
+- [x] students 表 classId 和 adminTeacherId 有数据库索引
+- [x] TypeScript 类型检查通过
+- [x] ESLint 检查通过
+- [x] Next.js 构建通过
