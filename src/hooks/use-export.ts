@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback } from "react";
 import { toast } from "sonner";
 import type {
   FeedbackStudent,
@@ -17,6 +16,7 @@ interface UseExportOptions {
   students: FeedbackStudent[];
   tags: TagItem[];
   teachers: FeedbackTeacher[];
+  adminTeachers: FeedbackTeacher[];
   themes: { id: string; name: string }[];
   selectedStudentId: string;
   selectedThemeId: string;
@@ -35,6 +35,7 @@ export function useExport({
   students,
   tags,
   teachers,
+  adminTeachers,
   themes,
   selectedStudentId,
   selectedThemeId,
@@ -48,74 +49,43 @@ export function useExport({
   currentStageId,
   studentPhotos,
 }: UseExportOptions) {
-  const router = useRouter();
-  const [exporting, setExporting] = useState(false);
-
-  const handleExport = useCallback(async () => {
-    if (!generatedReport || !selectedStudentId) return;
-
-    setExporting(true);
-    try {
-      const student = students.find((s) => s.id === selectedStudentId);
-      const theme = themes.find((t) => t.id === selectedThemeId);
-      const teacher = teachers.find((t) => t.id === selectedTeacherId);
-
-      const response = await fetch("/api/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          studentName: student?.name,
-          grade: student?.grade,
-          className: student?.class_name,
-          theme: theme?.name,
-          feedbackDate,
-          teacherName: teacher?.name,
-          strengths: generatedReport.strengths,
-          improvements: generatedReport.improvements,
-          weaknesses: generatedReport.weaknesses,
-          recommendations: generatedReport.recommendations,
-          summary: generatedReport.summary,
-          tagRatings: Object.entries(tagRatings).map(([tagId, data]) => {
-            const tag = tags.find((t) => t.id === tagId);
-            return {
-              name: tag?.name || tagId.replace(/^custom-/, ""),
-              rating: data.rating,
-              note: data.note,
-            };
-          }),
-        }),
-      });
-
-      if (!response.ok) throw new Error("Export failed");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `教学反馈_${student?.name}_${feedbackDate}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.success("Word文档导出成功");
-      router.push("/");
-    } catch (error) {
-      console.error("Failed to export:", error);
-      toast.error("导出失败，请重试");
-    } finally {
-      setExporting(false);
-    }
-  }, [generatedReport, selectedStudentId, students, themes, selectedThemeId, teachers, selectedTeacherId, feedbackDate, tagRatings, tags, router]);
-
-  const handleExportPDF = useCallback(() => {
+  const handleExport = useCallback(() => {
     if (!generatedReport || !selectedStudentId) return;
 
     const student = students.find((s) => s.id === selectedStudentId);
     const theme = themes.find((t) => t.id === selectedThemeId);
-    const teacher = teachers.find((t) => t.id === selectedTeacherId);
-    const adminTeacher = teachers.find((t) => t.id === selectedAdminTeacherId);
+
+    // 查找教师：先按 selectedTeacherId 在两个数组中查找，若未找到则从学员数据回退
+    let teacher = teachers.find((t) => t.id === selectedTeacherId) || adminTeachers.find((t) => t.id === selectedTeacherId);
+    if (!teacher && student) {
+      const fallbackTeacherId = student.class?.teacher_id || student.admin_teacher?.id;
+      if (fallbackTeacherId) {
+        teacher = teachers.find((t) => t.id === fallbackTeacherId) || adminTeachers.find((t) => t.id === fallbackTeacherId);
+      }
+    }
+
+    // 查找教务教师：先按 selectedAdminTeacherId 在两个数组中查找，若未找到则从学员数据回退
+    let adminTeacher = adminTeachers.find((t) => t.id === selectedAdminTeacherId) || teachers.find((t) => t.id === selectedAdminTeacherId);
+    if (!adminTeacher && student) {
+      const fallbackAdminId = student.admin_teacher?.id;
+      if (fallbackAdminId) {
+        adminTeacher = adminTeachers.find((t) => t.id === fallbackAdminId) || teachers.find((t) => t.id === fallbackAdminId);
+      }
+    }
+
+    // 当电话号码缺失时发出警告
+    if (teacher && !teacher.phone) {
+      console.warn(`[useExport] 教师 ${teacher.name}(${teacher.id}) 缺少电话号码`);
+    }
+    if (adminTeacher && !adminTeacher.phone) {
+      console.warn(`[useExport] 教务 ${adminTeacher.name}(${adminTeacher.id}) 缺少电话号码`);
+    }
+    if (!teacher) {
+      console.warn(`[useExport] 未找到教师(selectedTeacherId=${selectedTeacherId})，学员数据回退也未命中`);
+    }
+    if (!adminTeacher) {
+      console.warn(`[useExport] 未找到教务教师(selectedAdminTeacherId=${selectedAdminTeacherId})，学员数据回退也未命中`);
+    }
 
     const reportData = {
       studentId: selectedStudentId,
@@ -131,7 +101,7 @@ export function useExport({
       teacherPhone: teacher?.phone,
       adminTeacherName: adminTeacher?.name,
       adminTeacherPhone: adminTeacher?.phone,
-      campus: student?.school || "",
+      campus: student?.school || "南沙万达校区",
       strengths: generatedReport.strengths,
       improvements: generatedReport.improvements,
       weaknesses: generatedReport.weaknesses,
@@ -154,24 +124,22 @@ export function useExport({
     const dataString = JSON.stringify(reportData);
     const dataSizeMB = new Blob([dataString]).size / (1024 * 1024);
 
-    if (dataSizeMB > 4) {
-      toast.warning(`数据量较大(${dataSizeMB.toFixed(1)}MB)，建议减少照片数量以确保正常导出`);
+    if (dataSizeMB > 3) {
+      toast.warning(`数据量较大(${dataSizeMB.toFixed(1)}MB)，建议减少至3张照片以内以确保正常导出`);
     }
 
     try {
-      sessionStorage.setItem("pdfReportData", dataString);
+      localStorage.setItem("pdfReportData", dataString);
     } catch (e) {
-      console.error("sessionStorage存储失败:", e);
+      console.error("localStorage存储失败:", e);
       toast.error("数据量过大，请减少照片数量后重试");
       return;
     }
 
-    router.push("/feedback/pdf");
-  }, [generatedReport, selectedStudentId, students, themes, selectedThemeId, teachers, selectedTeacherId, selectedAdminTeacherId, feedbackDate, tagRatings, tags, hasCoursePlan, coursePlans, currentStageId, studentPhotos]);
+    window.open("/feedback/pdf", "_blank");
+  }, [generatedReport, selectedStudentId, students, themes, selectedThemeId, teachers, adminTeachers, selectedTeacherId, selectedAdminTeacherId, feedbackDate, tagRatings, tags, hasCoursePlan, coursePlans, currentStageId, studentPhotos]);
 
   return {
-    exporting,
     handleExport,
-    handleExportPDF,
   };
 }

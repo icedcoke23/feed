@@ -6,8 +6,10 @@ import https from "https";
 import http from "http";
 import { isSafeUrlAsync } from "@/lib/ssrf-guard";
 import { getAuthUser } from "@/lib/route-auth";
+import { getServerSupabaseClient } from "@/storage/database/supabase-client";
 import { errorResponse } from "@/lib/api-response";
 import { unauthorizedError } from "@/lib/api-error";
+import { getCoursePromptByStageCode } from "@/lib/course-prompt";
 
 const reviewSchema = z.object({
   studentName: z.string().max(50).optional(),
@@ -22,8 +24,12 @@ const reviewSchema = z.object({
   tagInfo: z.array(z.object({
     name: z.string().max(50),
     rating: z.number().min(1).max(5),
-    note: z.string().max(200).optional(),
+    note: z.string().max(200).optional().nullable(),
   })).optional(),
+  // 课程阶段提示词相关参数（可选）
+  promptStageCode: z.string().max(50).optional(),
+  currentStageId: z.string().max(50).optional(),
+  level: z.string().max(50).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -41,7 +47,48 @@ export async function POST(request: NextRequest) {
     }
     const result = validateInput(reviewSchema, body);
     if ("error" in result) return result.error;
-    const { studentName, theme, report, tagInfo } = result.data;
+    const { studentName, theme, report, tagInfo, promptStageCode, currentStageId, level } = result.data;
+
+    // 解析课程阶段提示词：优先使用显式传入的 promptStageCode，
+    // 否则尝试从 currentStageId 或 theme+level 推导 stage_code
+    const supabase = getServerSupabaseClient();
+    let courseSystemPrompt: string | null = null;
+    let stageCodeToQuery = promptStageCode;
+
+    if (!stageCodeToQuery && currentStageId) {
+      const { data: stageData } = await supabase
+        .from("course_stages")
+        .select("stage_code")
+        .eq("id", currentStageId)
+        .or("is_active.eq.true,is_active.is.null")
+        .maybeSingle();
+      if (stageData?.stage_code) {
+        stageCodeToQuery = stageData.stage_code;
+      }
+    }
+
+    if (!stageCodeToQuery && theme && level) {
+      const { data: stageData } = await supabase
+        .from("course_stages")
+        .select("stage_code")
+        .eq("theme", theme)
+        .eq("level", level)
+        .or("is_active.eq.true,is_active.is.null")
+        .limit(1)
+        .maybeSingle();
+      if (stageData?.stage_code) {
+        stageCodeToQuery = stageData.stage_code;
+      }
+    }
+
+    if (stageCodeToQuery) {
+      const coursePrompt = await getCoursePromptByStageCode(supabase, stageCodeToQuery);
+      if (coursePrompt?.system_prompt) {
+        courseSystemPrompt = coursePrompt.report_structure
+          ? `${coursePrompt.system_prompt}\n\n${coursePrompt.report_structure}`
+          : coursePrompt.system_prompt;
+      }
+    }
 
     const safeName = studentName ? sanitizeUserInput(studentName) : "学员";
     const safeTheme = theme ? sanitizeUserInput(theme) : "未指定";
@@ -83,17 +130,24 @@ ${tagInfoStr}
 5. 保持原文的核心意思，但可以优化表达方式
 6. 确保"需要提升"部分措辞委婉但明确
 
-请直接输出优化后的报告，格式如下：
+请直接输出优化后的报告，每部分必须使用 "## 【标题】" 作为标题行，格式如下（注意字数限制）：
 
-【学员优点】（优化后的优点描述）
+## 【学员优点】
+（100-150字，优化后的优点描述）
 
-【能力提升】（优化后的提升描述）
+## 【能力提升】
+（100-150字，优化后的提升描述）
 
-【需要提升】（优化后的待提升描述）
+## 【需要提升】
+（80-120字，优化后的待提升描述）
 
-【阶段性建议】（优化后的建议）
+## 【阶段性建议】
+（100-150字，优化后的建议）
 
-【总结】（优化后的总结）`;
+## 【总结】
+（40-60字，优化后的总结）
+
+总字数控制在500-700字，每部分务必精炼。`;
 
     const aiSettings = await getAISettings();
     if (!aiSettings?.useCustomAI || !aiSettings.apiKey || !aiSettings.baseUrl) {
@@ -113,7 +167,9 @@ ${tagInfoStr}
 
     const aiRequestBody = JSON.stringify({
       model: aiSettings.modelId || "gpt-3.5-turbo",
-      messages: [{ role: "user", content: prompt }],
+      messages: courseSystemPrompt
+        ? [{ role: "system", content: courseSystemPrompt }, { role: "user", content: prompt }]
+        : [{ role: "user", content: prompt }],
       temperature: 0.5,
       stream: true,
     });
@@ -153,6 +209,10 @@ ${tagInfoStr}
           ctrl.close();
         }, 120_000);
         try {
+          // 在 reportData.metadata 中记录实际使用的 promptStageCode
+          if (stageCodeToQuery) {
+            ctrl.enqueue(encoder.encode(`data: ${JSON.stringify({ metadata: { promptStageCode: stageCodeToQuery } })}\n\n`));
+          }
           for await (const chunk of aiResponse.body as AsyncIterable<Buffer>) {
             buffer += decoder.decode(chunk, { stream: true });
             const parts = buffer.split("\n\n");

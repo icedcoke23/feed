@@ -82,6 +82,7 @@ function CreateFeedbackPage() {
     students,
     tags,
     teachers,
+    adminTeachers,
     themes,
     selectedStudentId: form.selectedStudentId,
     selectedThemeId: form.selectedThemeId,
@@ -130,6 +131,7 @@ function CreateFeedbackPage() {
       if (draft.hasCoursePlan !== undefined) form.setHasCoursePlan(draft.hasCoursePlan);
       if (draft.coursePlans) form.setCoursePlans(draft.coursePlans as { id: string; stage: string; theme: string; content: string; goal: string; status?: "completed" | "current" | "upcoming" }[]);
       if (draft.currentStageId) form.setCurrentStageId(draft.currentStageId);
+      if (draft.studentPhotos) form.setStudentPhotos(draft.studentPhotos);
       // 跳到有数据的步骤
       if (draft.generatedReport) {
         form.setCurrentStep(3);
@@ -231,6 +233,9 @@ function CreateFeedbackPage() {
                 onGenerate={report.handleGenerateReport}
                 onReview={report.handleReviewReport}
                 onUpdateReport={form.setGeneratedReport}
+                coursePlans={form.coursePlans}
+                currentStageId={form.currentStageId}
+                metadata={report.metadata}
               />
             )}
 
@@ -238,23 +243,16 @@ function CreateFeedbackPage() {
             {form.currentStep === 4 && (
               <StudentPhotos
                 studentPhotos={form.studentPhotos}
-                uploadingPhoto={form.uploadingPhoto}
-                onUpload={form.handlePhotoUpload}
-                onRemove={form.handleRemovePhoto}
-                onClearAll={() => form.setStudentPhotos([])}
-                onAddCroppedPhoto={form.handleAddCroppedPhoto}
-                onReplacePhoto={form.handleReplacePhoto}
+                onPhotosChange={form.setStudentPhotos}
               />
             )}
 
             {/* 步骤6: 导出文档 */}
             {form.currentStep === 5 && (
               <ExportPanel
-                exporting={exportHook.exporting}
                 saving={form.saving}
                 saved={!!savedFeedbackId}
-                onExportWord={exportHook.handleExport}
-                onExportPDF={exportHook.handleExportPDF}
+                onExport={exportHook.handleExport}
                 onSaveFeedback={handleSaveFeedback}
               />
             )}

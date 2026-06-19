@@ -62,11 +62,20 @@ function PDFPreviewPageContent() {
 
   // 加载报告数据
   useEffect(() => {
-    const storedData = sessionStorage.getItem("pdfReportData");
+    const storedData = localStorage.getItem("pdfReportData");
     if (storedData) {
-      try { setReportData(JSON.parse(storedData)); }
+      try {
+        const parsed = JSON.parse(storedData) as ReportData;
+        // 兼容旧数据：未设置校区时默认南沙万达校区
+        if (!parsed.campus || parsed.campus.trim() === "") {
+          parsed.campus = "南沙万达校区";
+        }
+        console.log("[PDF] studentPhotos:", parsed.studentPhotos);
+        setReportData(parsed);
+      }
       catch (e) {
         console.error("Failed to parse report data:", e);
+        console.error("[PDF] Raw data that failed to parse:", storedData);
         setNoData(true);
       }
     }
@@ -75,36 +84,75 @@ function PDFPreviewPageContent() {
   // 超时检测
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!sessionStorage.getItem("pdfReportData")) setNoData(true);
+      if (!localStorage.getItem("pdfReportData")) setNoData(true);
     }, 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  // 同步到 localStorage：任何字段编辑后立即持久化，确保刷新不丢失
+  useEffect(() => {
+    if (reportData) {
+      try {
+        localStorage.setItem("pdfReportData", JSON.stringify(reportData));
+      } catch (e) {
+        console.error("localStorage 同步失败:", e);
+      }
+    }
+  }, [reportData]);
 
   const handleSave = async (): Promise<boolean> => {
     if (!reportData || saving) return false;
     setSaving(true);
     try {
+      const tagRatingsRecord: Record<string, number> = {};
+      reportData.tagRatings?.forEach((tr) => { if (tr.name) tagRatingsRecord[tr.name] = tr.rating; });
+
       const saveData = {
         student_id: reportData.studentId, teacher_id: reportData.teacherId,
-        student_name: reportData.studentName, grade: reportData.grade,
-        class_name: reportData.className, school: reportData.school,
-        theme: reportData.theme, feedback_date: reportData.feedbackDate,
-        teacher_name: reportData.teacherName, teacher_phone: reportData.teacherPhone,
-        campus: reportData.campus, strengths: reportData.strengths,
-        improvements: reportData.improvements, weaknesses: reportData.weaknesses,
-        recommendations: reportData.recommendations, summary: reportData.summary,
-        tag_ratings: reportData.tagRatings, has_course_plan: reportData.hasCoursePlan,
-        course_plans: reportData.coursePlans, current_stage_id: reportData.currentStageId,
+        student_name: reportData.studentName, grade: reportData.grade || undefined,
+        class_name: reportData.className || undefined, school: reportData.school || undefined,
+        theme: reportData.theme || undefined, feedback_date: reportData.feedbackDate || undefined,
+        teacher_name: reportData.teacherName || undefined, teacher_phone: reportData.teacherPhone || undefined,
+        admin_teacher_name: reportData.adminTeacherName || undefined, admin_teacher_phone: reportData.adminTeacherPhone || undefined,
+        campus: reportData.campus || undefined,
+        strengths: reportData.strengths ? [{ tag: "学员优点", description: reportData.strengths }] : [],
+        improvements: reportData.improvements ? [{ tag: "能力提升", description: reportData.improvements }] : [],
+        weaknesses: reportData.weaknesses ? [{ tag: "需要提升", description: reportData.weaknesses }] : [],
+        recommendations: reportData.recommendations || undefined, summary: reportData.summary || undefined,
+        tag_ratings: tagRatingsRecord, has_course_plan: reportData.hasCoursePlan,
+        course_plans: reportData.coursePlans ? JSON.stringify(reportData.coursePlans) : undefined, current_stage_id: reportData.currentStageId || undefined,
         // BUG-9: 保存照片数据
         student_photos: reportData.studentPhotos?.map(p => ({ id: p.id, url: p.url })) || [],
+        // 封面信息与课程规划修改存入 metadata，便于后续恢复
+        metadata: {
+          coverInfo: {
+            studentName: reportData.studentName,
+            grade: reportData.grade,
+            school: reportData.school,
+            teacherName: reportData.teacherName,
+            teacherPhone: reportData.teacherPhone,
+            adminTeacherName: reportData.adminTeacherName,
+            adminTeacherPhone: reportData.adminTeacherPhone,
+          },
+          coursePlans: reportData.coursePlans,
+        },
         status: "completed",
       };
+      const bodyStr = JSON.stringify(saveData);
+      console.log('[Save] request body size:', bodyStr.length, 'bytes');
       const response = await fetch("/api/feedbacks", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(saveData),
+        body: bodyStr,
       });
       if (response.ok) { setSaved(true); toast.success("保存成功！"); return true; }
-      else { const errorData = await response.json(); toast.error(errorData.error || "保存失败"); return false; }
+      else {
+        const text = await response.text();
+        console.error('[Save] API raw response:', response.status, text.slice(0, 500));
+        let errorData: { error?: string } = {};
+        try { errorData = JSON.parse(text); } catch { /* not JSON */ }
+        toast.error(errorData.error || `保存失败 (HTTP ${response.status})`);
+        return false;
+      }
     } catch (e) {
       console.error("保存反馈失败:", e);
       toast.error("保存反馈失败，请重试");
@@ -127,9 +175,24 @@ function PDFPreviewPageContent() {
   };
   const cancelEdit = () => { setEditingField(null); setEditValue(""); };
 
+  // 封面页字段编辑回调（studentName, grade, school, teacherName, adminTeacherName）
+  const handleFieldChange = (field: string, value: string) => {
+    if (!reportData) return;
+    setReportData({ ...reportData, [field]: value });
+  };
+
+  // 课程规划单元格编辑回调（stage, theme, content, goal）
+  const handleCoursePlanChange = (planId: string, field: string, value: string) => {
+    if (!reportData || !reportData.coursePlans) return;
+    const newCoursePlans = reportData.coursePlans.map(plan =>
+      plan.id === planId ? { ...plan, [field]: value } : plan
+    );
+    setReportData({ ...reportData, coursePlans: newCoursePlans });
+  };
+
   const handleBack = () => {
-    const storedData = sessionStorage.getItem("pdfReportData");
-    if (storedData) sessionStorage.setItem("tempReportData", storedData);
+    const storedData = localStorage.getItem("pdfReportData");
+    if (storedData) localStorage.setItem("tempReportData", storedData);
     router.push("/feedback/new?step=4&restore=true");
   };
 
@@ -164,7 +227,7 @@ function PDFPreviewPageContent() {
 
       <div className="py-2 sm:py-8 print:py-0 overflow-x-auto">
         <div className="max-w-[210mm] mx-auto space-y-4 sm:space-y-8 print:space-y-0 min-w-[320px] sm:min-w-0">
-          <PdfCoverPage reportData={reportData} pageStyle={pageStyle} />
+          <PdfCoverPage reportData={reportData} pageStyle={pageStyle} onFieldChange={handleFieldChange} />
           <PdfAnalysisPage
             reportData={reportData} analysisPages={analysisPages}
             coursePlanPages={coursePlanPages} recommendationPages={recommendationPages}
@@ -174,6 +237,7 @@ function PDFPreviewPageContent() {
             onPhotoEdit={handlePhotoEdit} onPhotoDelete={handlePhotoDelete}
             onPhotoReplace={handlePhotoReplace} onPhotoCrop={handlePhotoCrop}
             onOpenPhotoEditor={openPhotoEditor}
+            onCoursePlanChange={handleCoursePlanChange}
           />
         </div>
       </div>
@@ -189,6 +253,7 @@ function PDFPreviewPageContent() {
           .print\\:py-0 { padding-top: 0 !important; padding-bottom: 0 !important; }
           .print\\:mb-0 { margin-bottom: 0 !important; }
           .print\\:space-y-0 > * + * { margin-top: 0 !important; }
+          .print-overflow-visible { overflow: visible !important; }
         }
       `}</style>
 

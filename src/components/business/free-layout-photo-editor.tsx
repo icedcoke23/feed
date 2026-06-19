@@ -23,28 +23,42 @@ export interface FreeLayoutPhotoEditorProps {
   onPhotoReplace?: (photoId: string, e: React.ChangeEvent<HTMLInputElement>) => void;
   onPhotoCrop?: (photoId: string, photoUrl: string) => void;
   containerHeight?: number;
+  fillContainer?: boolean;
 }
 
 /** 加载图片并获取其原始宽高比 */
 function loadImageAspect(url: string): Promise<number> {
   return new Promise((resolve) => {
+    if (!url || url.trim() === "") {
+      resolve(4 / 3);
+      return;
+    }
     const img = new window.Image();
     if (!url.startsWith("data:")) img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img.naturalWidth / img.naturalHeight);
+    img.onload = () => {
+      const ratio = img.naturalWidth / img.naturalHeight;
+      resolve(isFinite(ratio) && ratio > 0 ? ratio : 4 / 3);
+    };
     img.onerror = () => resolve(4 / 3); // fallback
     img.src = url;
   });
 }
 
-export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPhotoReplace, onPhotoCrop, containerHeight = 320 }: FreeLayoutPhotoEditorProps) {
+export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPhotoReplace, onPhotoCrop, containerHeight = 320, fillContainer = false }: FreeLayoutPhotoEditorProps) {
   const isEditable = !!onPhotoEdit;
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const validPhotos = photos.slice(0, 6).filter(p => p.url && p.url.trim());
+  if (photos.length > 0 && validPhotos.length === 0) {
+    console.warn("[PhotoEditor] photos provided but none have valid URLs:", photos);
+  }
 
   const [layouts, setLayouts] = useState<PhotoLayout[]>([]);
   const [prevPhotoIds, setPrevPhotoIds] = useState<string>("");
   const [zIndices, setZIndices] = useState<Record<string, number>>({});
   const nextZRef = useRef(10);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
 
   // 同步 photos prop 中的 URL 变更，并重新计算宽高比
   useEffect(() => {
@@ -79,10 +93,22 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
     if (currentPhotoIds === prevPhotoIds) return;
     setPrevPhotoIds(currentPhotoIds);
 
-    const count = Math.min(photos.length, 6);
-    if (count === 0) { setLayouts([]); return; }
+    // 过滤掉没有有效URL的照片
+    const validPhotos = photos.slice(0, 6).filter(p => p.url && p.url.trim());
+    console.log('[PhotoEditor] input photos:', photos.length, 'validPhotos:', validPhotos.length, 'urls:', validPhotos.map(p => ({id: p.id, urlLen: p.url?.length, urlPrefix: p.url?.slice(0, 30)})));
+    const count = validPhotos.length;
 
-    let cancelled = false;
+    // 清理已不存在照片的失败记录
+    setFailedImageIds(prev => {
+      const next = new Set(prev);
+      next.forEach(id => {
+        if (!validPhotos.find(p => p.id === id)) next.delete(id);
+      });
+      return next;
+    });
+
+    if (count === 0) { console.warn('[PhotoEditor] no valid photos'); setLayouts([]); return; }
+
     const initLayouts = async () => {
       const cols = count <= 2 ? count : 3;
       const gap = 12;
@@ -90,16 +116,14 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
       const photoWidth = (containerWidth - gap * (cols - 1)) / cols;
 
       // 并行加载所有图片的宽高比
-      const aspects = await Promise.all(photos.slice(0, 6).map(p => loadImageAspect(p.url)));
+      const aspects = await Promise.all(validPhotos.map(p => loadImageAspect(p.url)));
 
-      if (cancelled) return;
-
-      const newLayouts = photos.slice(0, 6).map((photo, i) => {
+      const newLayouts = validPhotos.map((photo, i) => {
         const row = Math.floor(i / cols);
         const col = i % cols;
         const ratio = aspects[i];
-        const w = photoWidth;
-        const h = photoWidth / ratio;
+        const w = Math.max(10, photoWidth);
+        const h = Math.max(10, photoWidth / (isFinite(ratio) && ratio > 0 ? ratio : 4 / 3));
         return {
           id: photo.id,
           url: photo.url,
@@ -108,7 +132,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
           y: row * (h + gap),
           width: w,
           height: h,
-          aspectRatio: ratio,
+          aspectRatio: isFinite(ratio) && ratio > 0 ? ratio : 4 / 3,
         };
       });
       setLayouts(newLayouts);
@@ -118,8 +142,25 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
       nextZRef.current = newLayouts.length + 1;
     };
     initLayouts();
-    return () => { cancelled = true; };
   }, [photos.map(p => p.id).join(","), prevPhotoIds]);
+
+  // 重试机制：首次计算时容器宽度可能为 0，延迟重新计算
+  useEffect(() => {
+    const currentPhotoIds = photos.slice(0, 6).map(p => p.id).join(",");
+    if (!currentPhotoIds) return;
+
+    const timer = setTimeout(() => {
+      const actualWidth = containerRef.current?.offsetWidth;
+      if (actualWidth && actualWidth > 0) {
+        // 检查当前布局是否使用了 fallback 宽度（600），如果是则重新计算
+        const usedFallback = layouts.length > 0 && Math.abs(layouts[0].width - ((600 - 12 * (Math.min(photos.length, 6) <= 2 ? Math.min(photos.length, 6) : 3) - 1) / (Math.min(photos.length, 6) <= 2 ? Math.min(photos.length, 6) : 3))) < 1;
+        if (usedFallback) {
+          setPrevPhotoIds(""); // 重置以触发重新计算
+        }
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [layouts, photos]);
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
     setLayouts(prev => prev.map(l => l.id === id ? { ...l, x: d.x, y: d.y } : l));
@@ -149,27 +190,30 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
   };
 
   if (photos.length === 0) return null;
+  console.log('[PhotoEditor] rendering, layouts count:', layouts.length, 'containerWidth:', containerRef.current?.offsetWidth);
 
   return (
     <div
       ref={containerRef}
-      className="relative print:relative"
+      className="relative print:relative print-overflow-visible"
       style={{
-        height: `${containerHeight}px`,
+        height: fillContainer ? '100%' : `${containerHeight}px`,
         minHeight: '200px',
         backgroundColor: isEditable ? '#fafafa' : 'transparent',
         borderRadius: '8px',
-        border: isEditable ? '1px dashed #d1d5db' : 'none',
+        border: isEditable ? '1px dashed #d1d5db' : '2px solid red',
         overflow: 'hidden',
       }}
     >
+      {layouts.length === 0 && <div className="flex items-center justify-center h-full text-gray-400 text-sm">正在加载照片...</div>}
       {layouts.map((layout) => {
         const zIndex = zIndices[layout.id] || 1;
         const canReset = layout.url !== layout.originalUrl;
+        const isHovered = hoveredId === layout.id;
 
         return (
-          <div key={layout.id} style={{ position: 'absolute', zIndex }}>
           <Rnd
+            key={layout.id}
             position={{ x: layout.x, y: layout.y }}
             size={{ width: layout.width, height: layout.height }}
             onDragStart={() => bringToFront(layout.id)}
@@ -182,8 +226,8 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
                 height: parseFloat(_ref.style.height),
               });
             }}
-            enableResizing={isEditable && hoveredId === layout.id ? {
-              top: true, right: true, bottom: true, left: true,
+            enableResizing={isEditable ? {
+              top: false, right: false, bottom: false, left: false,
               topRight: true, bottomRight: true, bottomLeft: true, topLeft: true,
             } : false}
             disableDragging={!isEditable}
@@ -191,22 +235,18 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
             minWidth={80}
             minHeight={60}
             resizeHandleStyles={{
-              top: { width: '100%', height: '8px', top: '-4px', cursor: 'ns-resize' },
-              bottom: { width: '100%', height: '8px', bottom: '-4px', cursor: 'ns-resize' },
-              left: { height: '100%', width: '8px', left: '-4px', cursor: 'ew-resize' },
-              right: { height: '100%', width: '8px', right: '-4px', cursor: 'ew-resize' },
-              topLeft: { width: '12px', height: '12px', top: '-4px', left: '-4px', cursor: 'nwse-resize' },
-              topRight: { width: '12px', height: '12px', top: '-4px', right: '-4px', cursor: 'nesw-resize' },
-              bottomLeft: { width: '12px', height: '12px', bottom: '-4px', left: '-4px', cursor: 'nesw-resize' },
-              bottomRight: { width: '12px', height: '12px', bottom: '-4px', right: '-4px', cursor: 'nwse-resize' },
+              topRight: { width: '16px', height: '16px', top: '-4px', right: '-4px', cursor: 'nesw-resize' },
+              bottomRight: { width: '16px', height: '16px', bottom: '-4px', right: '-4px', cursor: 'nwse-resize' },
+              bottomLeft: { width: '16px', height: '16px', bottom: '-4px', left: '-4px', cursor: 'nesw-resize' },
+              topLeft: { width: '16px', height: '16px', top: '-4px', left: '-4px', cursor: 'nwse-resize' },
             }}
             resizeHandleComponent={{
-              topLeft: <div className="w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-sm print:hidden" />,
-              topRight: <div className="w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-sm print:hidden" />,
-              bottomLeft: <div className="w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-sm print:hidden" />,
-              bottomRight: <div className="w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-sm print:hidden" />,
+              topRight: <div className={`w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-sm print:hidden transition-opacity duration-150 ${isHovered ? 'opacity-100' : 'opacity-0'}`} />,
+              bottomRight: <div className={`w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-sm print:hidden transition-opacity duration-150 ${isHovered ? 'opacity-100' : 'opacity-0'}`} />,
+              bottomLeft: <div className={`w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-sm print:hidden transition-opacity duration-150 ${isHovered ? 'opacity-100' : 'opacity-0'}`} />,
+              topLeft: <div className={`w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-sm print:hidden transition-opacity duration-150 ${isHovered ? 'opacity-100' : 'opacity-0'}`} />,
             }}
-            style={{ position: 'absolute' }}
+            style={{ position: 'absolute', zIndex }}
             className="group/photo"
             onMouseEnter={() => setHoveredId(layout.id)}
             onMouseLeave={() => setHoveredId(null)}
@@ -216,9 +256,25 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
               border: isEditable ? '1px solid #d1d5db' : '1px solid #e5e7eb',
               backgroundColor: '#fafafa', position: 'relative',
             }}>
+              {failedImageIds.has(layout.id) ? (
+                <div style={{
+                  width: '100%', height: '100%',
+                  backgroundColor: '#e5e7eb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#9ca3af', fontSize: '14px',
+                }}>
+                  图片加载失败
+                </div>
+              ) : (
               <img
                 src={layout.url}
                 alt="学员照片"
+                loading="eager"
+                onLoad={() => console.log('[Photo] loaded:', layout.id)}
+                onError={() => {
+                  console.error('[Photo] load failed:', layout.id, layout.url);
+                  setFailedImageIds(prev => new Set(prev).add(layout.id));
+                }}
                 style={{
                   width: '100%',
                   height: '100%',
@@ -228,6 +284,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
                   backgroundColor: '#f5f5f5',
                 }}
               />
+              )}
 
               {/* hover 操作按钮 */}
               {isEditable && (
@@ -276,7 +333,6 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
               )}
             </div>
           </Rnd>
-          </div>
         );
       })}
     </div>

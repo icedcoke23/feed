@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { Pencil } from "lucide-react";
 import type { ReportData } from "@/types/feedback";
 
 // 页面配置常量
@@ -15,6 +16,7 @@ const LOGO_URL = process.env.NEXT_PUBLIC_LOGO_URL || "/images/logo.png";
 export interface PdfCoverPageProps {
   reportData: ReportData;
   pageStyle: React.CSSProperties;
+  onFieldChange?: (field: string, value: string) => void;
 }
 
 // 智能分析：获取当前阶段名称
@@ -38,13 +40,17 @@ function getCurrentStageName(reportData: ReportData): string {
   return "";
 }
 
-// 智能分析：处理学校显示
+// 智能分析：处理校区/学校显示，统一显示为“校区”
 function getSchoolDisplay(reportData: ReportData): { label: string; value: string } {
+  const campus = reportData?.campus;
   const school = reportData?.school;
-  if (!school || school === "-" || school.trim() === "") {
-    return { label: "校区", value: "" };
-  }
-  return { label: "学校", value: school };
+  const value =
+    (campus && campus.trim() !== "" && campus !== "-"
+      ? campus
+      : school && school.trim() !== "" && school !== "-"
+        ? school
+        : "南沙万达校区");
+  return { label: "校区", value };
 }
 
 // 智能分析：处理年级/阶段显示
@@ -57,7 +63,80 @@ function getGradeDisplay(reportData: ReportData): { label: string; value: string
   return { label: "年级", value: grade };
 }
 
-export function PdfCoverPage({ reportData, pageStyle }: PdfCoverPageProps) {
+// 可编辑表格单元格组件（单行文本，点击变为输入框，失焦或回车保存）
+function EditableCell({
+  field,
+  value,
+  suffix,
+  editingField,
+  editValue,
+  onEditValueChange,
+  onStartEditing,
+  onSaveEdit,
+  onCancelEdit,
+}: {
+  field: string;
+  value: string;
+  suffix?: string;
+  editingField: string | null;
+  editValue: string;
+  onEditValueChange: (value: string) => void;
+  onStartEditing: (field: string, value: string) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+}) {
+  const isEditing = editingField === field;
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onSaveEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancelEdit();
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <input
+        ref={inputRef}
+        value={editValue}
+        onChange={e => onEditValueChange(e.target.value)}
+        onBlur={onSaveEdit}
+        onKeyDown={handleKeyDown}
+        className="w-full px-1 py-0 border border-blue-400 rounded text-base text-center focus:outline-none focus:ring-1 focus:ring-blue-300 print:hidden"
+      />
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center group">
+      <span className="truncate">{value || "-"}{suffix}</span>
+      <button
+        onClick={() => onStartEditing(field, value === "-" ? "" : value)}
+        className="print:hidden opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 ml-1 p-0.5"
+        title="编辑"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
+export function PdfCoverPage({ reportData, pageStyle, onFieldChange }: PdfCoverPageProps) {
+  // 封面页本地编辑状态
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
   const coverContentStyle: React.CSSProperties = {
     position: "absolute",
     top: `${COVER_PADDING_TOP}mm`,
@@ -69,6 +148,23 @@ export function PdfCoverPage({ reportData, pageStyle }: PdfCoverPageProps) {
 
   const schoolDisplay = getSchoolDisplay(reportData);
   const gradeDisplay = getGradeDisplay(reportData);
+
+  const startEditing = (field: string, value: string) => {
+    setEditingField(field);
+    setEditValue(value);
+  };
+
+  const saveEdit = () => {
+    if (!editingField) return;
+    onFieldChange?.(editingField, editValue);
+    setEditingField(null);
+    setEditValue("");
+  };
+
+  const cancelEdit = () => {
+    setEditingField(null);
+    setEditValue("");
+  };
 
   return (
     <div
@@ -100,22 +196,73 @@ export function PdfCoverPage({ reportData, pageStyle }: PdfCoverPageProps) {
             <tbody>
               <tr className="h-14">
                 <td className="border border-gray-400 px-2 bg-gray-100 font-bold text-base text-center w-[14%] whitespace-nowrap">学员姓名</td>
-                <td className="border border-gray-400 px-2 text-base text-center w-[19%] whitespace-nowrap truncate">{reportData.studentName}</td>
+                <td className="border border-gray-400 px-2 text-base text-center w-[19%] whitespace-nowrap">
+                  <EditableCell
+                    field="studentName"
+                    value={reportData.studentName || ""}
+                    editingField={editingField}
+                    editValue={editValue}
+                    onEditValueChange={setEditValue}
+                    onStartEditing={startEditing}
+                    onSaveEdit={saveEdit}
+                    onCancelEdit={cancelEdit}
+                  />
+                </td>
                 <td className="border border-gray-400 px-2 bg-gray-100 font-bold text-base text-center w-[14%] whitespace-nowrap">{gradeDisplay.label}</td>
-                <td className="border border-gray-400 px-2 text-base text-center w-[19%] whitespace-nowrap">{gradeDisplay.value}</td>
+                <td className="border border-gray-400 px-2 text-base text-center w-[19%] whitespace-nowrap">
+                  <EditableCell
+                    field="grade"
+                    value={gradeDisplay.value}
+                    editingField={editingField}
+                    editValue={editValue}
+                    onEditValueChange={setEditValue}
+                    onStartEditing={startEditing}
+                    onSaveEdit={saveEdit}
+                    onCancelEdit={cancelEdit}
+                  />
+                </td>
                 <td className="border border-gray-400 px-2 bg-gray-100 font-bold text-base text-center w-[14%] whitespace-nowrap">{schoolDisplay.label}</td>
-                <td className="border border-gray-400 px-2 text-base text-center w-[20%] whitespace-nowrap truncate">{schoolDisplay.value}</td>
+                <td className="border border-gray-400 px-2 text-base text-center w-[20%] whitespace-nowrap">
+                  <EditableCell
+                    field="school"
+                    value={schoolDisplay.value}
+                    editingField={editingField}
+                    editValue={editValue}
+                    onEditValueChange={setEditValue}
+                    onStartEditing={startEditing}
+                    onSaveEdit={saveEdit}
+                    onCancelEdit={cancelEdit}
+                  />
+                </td>
               </tr>
               <tr className="h-14">
                 <td className="border border-gray-400 px-2 bg-gray-100 font-bold text-base text-center whitespace-nowrap">讲师</td>
                 <td className="border border-gray-400 px-2 text-base text-center whitespace-nowrap" colSpan={2}>
-                  <span>{reportData.teacherName || "-"}</span>
-                  {reportData.teacherPhone && <span className="text-gray-500 text-sm ml-1">({reportData.teacherPhone})</span>}
+                  <EditableCell
+                    field="teacherName"
+                    value={reportData.teacherName || ""}
+                    suffix={reportData.teacherPhone ? `(${reportData.teacherPhone})` : undefined}
+                    editingField={editingField}
+                    editValue={editValue}
+                    onEditValueChange={setEditValue}
+                    onStartEditing={startEditing}
+                    onSaveEdit={saveEdit}
+                    onCancelEdit={cancelEdit}
+                  />
                 </td>
                 <td className="border border-gray-400 px-2 bg-gray-100 font-bold text-base text-center whitespace-nowrap">教务老师</td>
                 <td className="border border-gray-400 px-2 text-base text-center whitespace-nowrap" colSpan={2}>
-                  <span>{reportData.adminTeacherName || "-"}</span>
-                  {reportData.adminTeacherPhone && <span className="text-gray-500 text-sm ml-1">({reportData.adminTeacherPhone})</span>}
+                  <EditableCell
+                    field="adminTeacherName"
+                    value={reportData.adminTeacherName || ""}
+                    suffix={reportData.adminTeacherPhone ? `(${reportData.adminTeacherPhone})` : undefined}
+                    editingField={editingField}
+                    editValue={editValue}
+                    onEditValueChange={setEditValue}
+                    onStartEditing={startEditing}
+                    onSaveEdit={saveEdit}
+                    onCancelEdit={cancelEdit}
+                  />
                 </td>
               </tr>
             </tbody>

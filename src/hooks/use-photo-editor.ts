@@ -4,6 +4,23 @@ import { useState } from "react";
 import type { ReportData } from "@/types/feedback";
 import { compressImage } from "@/utils/compress-image";
 
+/** 将 File/Blob 读取为 base64 data URL，确保跨标签页、跨会话可用 */
+function readFileAsDataURL(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === "string") {
+        resolve(result);
+      } else {
+        reject(new Error("读取图片失败"));
+      }
+    };
+    reader.onerror = () => reject(new Error("FileReader 错误"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export interface UsePhotoEditorReturn {
   photoEditorOpen: boolean;
   photoEditorPhotos: Array<{ id: string; url: string }>;
@@ -46,7 +63,7 @@ export function usePhotoEditor(
       if (!file.type.startsWith("image/")) return;
       try {
         const compressedFile = await compressImage(file, 1200, 0.7);
-        const url = URL.createObjectURL(compressedFile);
+        const url = await readFileAsDataURL(compressedFile);
         setPhotoEditorPhotos(prev => {
           if (prev.length >= 10) return prev;
           return [...prev, { id: `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, url }];
@@ -102,7 +119,7 @@ export function usePhotoEditor(
     (async () => {
       try {
         const compressedFile = await compressImage(file, 1200, 0.7);
-        const url = URL.createObjectURL(compressedFile);
+        const url = await readFileAsDataURL(compressedFile);
         setReportData({
           ...reportData,
           studentPhotos: reportData.studentPhotos.map(p => p.id === photoId ? { ...p, url } : p),

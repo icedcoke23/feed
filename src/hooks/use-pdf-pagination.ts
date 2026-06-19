@@ -8,30 +8,43 @@ import type {
   RecommendationPageData,
 } from "@/components/business/pdf-analysis-page";
 
-// 计算文本实际显示行数
-function calculateLines(text: string, charsPerLine: number): number {
+// ============================================================
+// 真实行数常量（基于 A4 + text-base/leading-relaxed 实测）
+// A4 内容区高度: 297mm - 30mm(top) - 20mm(bottom) = 247mm ≈ 934px
+// 每行高度: 16px(font) × 1.625(leading-relaxed) ≈ 26px
+// 实际可用行数: 934 / 26 ≈ 35 行（保守取30）
+// ============================================================
+const CHARS_PER_LINE = 32;   // 保守估计（实际约35字/行）
+const LINES_PER_PAGE = 30;   // 真实可用行数
+
+// 各类开销行数估算
+const PAGE_HEADER_LINES = 2;    // 页面标题栏（"第一部分：教师教学方案"）
+const SECTION_TITLE_LINES = 1;  // 小节标题（"◆ 学情分析"）
+const CARD_OVERHEAD_LINES = 2;  // 每个卡片：标题 + 内边距
+const SIGNATURE_LINES = 2;      // 落款区域（合并为一行）
+const CONT_HEADER_LINES = 1;    // 续页标题（"学情分析（续）"）
+
+// ============================================================
+// 文本行数计算
+// ============================================================
+
+/** 计算文本实际显示行数（模拟 formatContent 的处理） */
+function calculateLines(text: string): number {
   if (!text) return 0;
-
-  // 模拟formatContent的处理：按换行分割，每段缩进，段间无额外空行
   const paragraphs = text.split("\n").filter(p => p.trim());
-
   let totalLines = 0;
   for (const para of paragraphs) {
-    // 每段开头缩进两字符，实际内容长度
-    const contentLength = para.trim().length + 2; // +2 for indent
-    // 计算该段需要的行数（向上取整）
-    const paraLines = Math.ceil(contentLength / charsPerLine);
-    totalLines += paraLines;
+    // 每段缩进两字符，实际内容长度
+    const contentLength = para.trim().length + 2;
+    totalLines += Math.ceil(contentLength / CHARS_PER_LINE);
   }
-
   return totalLines;
 }
 
-// 根据行数限制分割文本
+/** 按行数限制分割文本，返回当前页内容和剩余内容 */
 function splitTextByLines(
   text: string,
-  maxLines: number,
-  charsPerLine: number
+  maxLines: number
 ): { content: string; remaining: string } {
   if (!text) return { content: "", remaining: "" };
 
@@ -41,20 +54,18 @@ function splitTextByLines(
 
   for (let i = 0; i < paragraphs.length; i++) {
     const para = paragraphs[i].trim();
-    const contentLength = para.length + 2; // +2 for indent
-    const paraLines = Math.ceil(contentLength / charsPerLine);
+    const contentLength = para.length + 2;
+    const paraLines = Math.ceil(contentLength / CHARS_PER_LINE);
 
-    // 检查是否可以包含这段（段间无额外空行）
     if (currentLines + paraLines <= maxLines) {
       includedParagraphs.push(para);
       currentLines += paraLines;
     } else {
-      // 无法完整包含这段，需要分割
+      // 无法完整包含这段
       if (includedParagraphs.length === 0) {
-        // 如果是第一段就超出，按字符数强制分割
-        const availableChars = maxLines * charsPerLine - 2; // -2 for indent
+        // 第一段就超出，按字符数强制分割
+        const availableChars = maxLines * CHARS_PER_LINE - 2;
         if (availableChars > 0 && para.length > availableChars) {
-          // 找到合适的分割点
           let splitPoint = availableChars;
           const sentenceEnd = para.lastIndexOf("。", splitPoint);
           if (sentenceEnd > splitPoint * 0.3) {
@@ -68,7 +79,6 @@ function splitTextByLines(
           };
         }
       }
-      // 返回已包含的段落和剩余段落
       const remainingParagraphs = paragraphs.slice(i);
       return {
         content: includedParagraphs.join("\n"),
@@ -77,118 +87,49 @@ function splitTextByLines(
     }
   }
 
-  // 所有内容都能放入
-  return {
-    content: includedParagraphs.join("\n"),
-    remaining: ""
-  };
+  return { content: includedParagraphs.join("\n"), remaining: "" };
 }
 
-// 计算学情分析的分页（基于行数）- 支持三个部分
+// ============================================================
+// 学情分析分页（强制单页，超出内容智能截断）
+// ============================================================
+
+/** 计算学情分析分页 - 强制单页显示，不截断内容 */
 function calculateAnalysisPages(
   strengths: string,
   improvements: string,
   weaknesses: string
 ): AnalysisPageData[] {
-  // 如果三者都为空，不创建任何分析页面
   if (!strengths?.trim() && !improvements?.trim() && !weaknesses?.trim()) {
     return [];
   }
 
-  const CHARS_PER_LINE = 30;
-  const LINES_PER_PAGE = 35;
-  const HEADER_LINES = 3;
-
-  const pages: AnalysisPageData[] = [];
-
-  let remainingStrengths = strengths || "";
-  let remainingImprovements = improvements || "";
-  let remainingWeaknesses = weaknesses || "";
-  let isFirstPage = true;
-
-  while (remainingStrengths || remainingImprovements || remainingWeaknesses) {
-    const pageContent: AnalysisPageData = {
-      showTitle: isFirstPage,
-      isContinuation: !isFirstPage,
-    };
-
-    // 计算当前页可用行数
-    const availableLines = isFirstPage ? LINES_PER_PAGE - HEADER_LINES : LINES_PER_PAGE - 1;
-
-    // 卡片标题和边距约2行
-    let contentAvailableLines = Math.max(1, availableLines - 2);
-
-    // 处理学员优点
-    if (remainingStrengths) {
-      const strengthsLines = calculateLines(remainingStrengths, CHARS_PER_LINE);
-
-      if (strengthsLines <= contentAvailableLines) {
-        pageContent.strengths = remainingStrengths;
-        pageContent.strengthsLabel = isFirstPage ? "描述学员优点：" : "学员优点（续）：";
-        remainingStrengths = "";
-
-        const usedLines = strengthsLines + 2;
-        contentAvailableLines = contentAvailableLines - usedLines - 1;
-      } else {
-        const result = splitTextByLines(remainingStrengths, contentAvailableLines, CHARS_PER_LINE);
-        pageContent.strengths = result.content;
-        pageContent.strengthsLabel = isFirstPage ? "描述学员优点：" : "学员优点（续）：";
-        remainingStrengths = result.remaining;
-      }
-    }
-
-    // 处理能力提升
-    if (!remainingStrengths && remainingImprovements && contentAvailableLines > 2) {
-      const improvementsLines = calculateLines(remainingImprovements, CHARS_PER_LINE);
-
-      if (improvementsLines <= contentAvailableLines) {
-        pageContent.improvements = remainingImprovements;
-        pageContent.improvementsLabel = isFirstPage && !pageContent.strengths ? "能力提升：" : (pageContent.strengths ? "能力提升：" : "能力提升（续）：");
-        remainingImprovements = "";
-        const usedLines = improvementsLines + 2;
-        contentAvailableLines = contentAvailableLines - usedLines - 1;
-      } else {
-        const result = splitTextByLines(remainingImprovements, contentAvailableLines, CHARS_PER_LINE);
-        pageContent.improvements = result.content;
-        pageContent.improvementsLabel = pageContent.strengths ? "能力提升：" : "能力提升（续）：";
-        remainingImprovements = result.remaining;
-      }
-    }
-
-    // 处理需要提升
-    if (!remainingStrengths && !remainingImprovements && remainingWeaknesses && contentAvailableLines > 2) {
-      const weaknessesLines = calculateLines(remainingWeaknesses, CHARS_PER_LINE);
-
-      if (weaknessesLines <= contentAvailableLines) {
-        pageContent.weaknesses = remainingWeaknesses;
-        pageContent.weaknessesLabel = isFirstPage && !pageContent.strengths && !pageContent.improvements ? "需要提升：" : "需要提升：";
-        remainingWeaknesses = "";
-      } else {
-        const result = splitTextByLines(remainingWeaknesses, contentAvailableLines, CHARS_PER_LINE);
-        pageContent.weaknesses = result.content;
-        pageContent.weaknessesLabel = "需要提升：";
-        remainingWeaknesses = result.remaining;
-      }
-    }
-
-    // 只有当页面有实际内容时才添加
-    if (pageContent.strengths || pageContent.improvements || pageContent.weaknesses) {
-      pages.push(pageContent);
-    }
-    isFirstPage = false;
-  }
-
-  return pages;
+  // 强制单页，返回完整内容，由 CSS overflow 控制显示
+  return [{
+    showTitle: true,
+    isContinuation: false,
+    strengths: strengths?.trim() || undefined,
+    improvements: improvements?.trim() || undefined,
+    weaknesses: weaknesses?.trim() || undefined,
+    strengthsLabel: "学员优点",
+    improvementsLabel: "能力提升",
+    weaknessesLabel: "需要提升",
+  }];
 }
 
-// 计算课程规划表格分页
+// ============================================================
+// 课程规划分页（目标1页，最多2页）
+// ============================================================
+
 function calculateCoursePlanPages(plans: CoursePlan[]): CoursePlanPageData[] {
-  const ROWS_PER_FIRST_PAGE = 8;
-  const ROWS_PER_PAGE = 10;
+  // 每页可用行数（表格行，非文本行）
+  // 首页需要减去页面标题和表格标题
+  const ROWS_PER_FIRST_PAGE = 7;
+  const ROWS_PER_CONT_PAGE = 10;
+  const MAX_PAGES = 2;
 
   const pages: CoursePlanPageData[] = [];
-
-  let remainingPlans = [...plans];
+  const remainingPlans = [...plans];
   let pageNum = 1;
 
   // 首页
@@ -198,69 +139,69 @@ function calculateCoursePlanPages(plans: CoursePlan[]): CoursePlanPageData[] {
       plans: firstPagePlans,
       isFirstPage: true,
       pageNum,
-      totalPages: Math.ceil((plans.length - ROWS_PER_FIRST_PAGE) / ROWS_PER_PAGE) + 1
+      totalPages: 1, // 先设为1，后面更新
     });
     pageNum++;
   }
 
-  // 后续页
-  while (remainingPlans.length > 0) {
-    const pagePlans = remainingPlans.splice(0, ROWS_PER_PAGE);
+  // 后续页（最多再1页，总共2页）
+  if (remainingPlans.length > 0 && pages.length < MAX_PAGES) {
+    const pagePlans = remainingPlans.splice(0, ROWS_PER_CONT_PAGE);
     pages.push({
       plans: pagePlans,
       isFirstPage: false,
       pageNum,
-      totalPages: Math.ceil((plans.length - ROWS_PER_FIRST_PAGE) / ROWS_PER_PAGE) + 1
+      totalPages: 1,
     });
-    pageNum++;
   }
 
-  return pages;
-}
-
-// 计算教师建议的分页
-function calculateRecommendationPages(recommendations: string): RecommendationPageData[] {
-  if (!recommendations) {
-    return [];
-  }
-
-  const CHARS_PER_LINE = 30;
-  const LINES_PER_PAGE = 35;
-  const HEADER_LINES = 2;
-  const FOOTER_LINES = 4;
-
-  const pages: RecommendationPageData[] = [];
-
-  let remainingContent = recommendations;
-  let pageNum = 1;
-
-  while (remainingContent) {
-    const isFirstPage = pages.length === 0;
-    const availableLines = isFirstPage
-      ? LINES_PER_PAGE - HEADER_LINES - FOOTER_LINES
-      : LINES_PER_PAGE - 2;
-
-    const result = splitTextByLines(remainingContent, availableLines, CHARS_PER_LINE);
-
-    if (result.content) {
-      const totalPages = Math.ceil(calculateLines(recommendations, CHARS_PER_LINE) / availableLines);
-      pages.push({
-        content: result.content,
-        isFirstPage,
-        pageNum,
-        totalPages: Math.max(totalPages, pageNum)
-      });
-      pageNum++;
-    }
-
-    remainingContent = result.remaining;
-    if (!result.remaining) break;
+  // 如果还有剩余行（超过2页容量），追加到最后一页
+  if (remainingPlans.length > 0 && pages.length > 0) {
+    const lastPage = pages[pages.length - 1];
+    lastPage.plans = [...lastPage.plans, ...remainingPlans];
   }
 
   // 更新总页数
   const totalPages = pages.length;
   return pages.map(p => ({ ...p, totalPages }));
 }
+
+// ============================================================
+// 教师建议分页（智能1-2页，落款和照片仅在最后一页）
+// ============================================================
+
+/** 根据照片数量计算照片区域占用的行数 */
+function calcPhotoLines(photoCount: number): number {
+  if (photoCount <= 0) return 0;
+  // 照片区域高度：1-2张280px, 3-4张360px, 5-6张440px
+  // 每行约36px，加上标题行和间距约2行
+  const photoHeight = photoCount <= 2 ? 280 : photoCount <= 4 ? 360 : 440;
+  return Math.ceil(photoHeight / 36) + 2;
+}
+
+function calculateRecommendationPages(
+  recommendations: string,
+  summary: string,
+  _photoCount: number = 0
+): RecommendationPageData[] {
+  if (!recommendations?.trim() && !summary?.trim()) {
+    return [];
+  }
+
+  // 强制单页，返回完整内容，由 CSS overflow 控制显示
+  return [{
+    content: recommendations?.trim() || "",
+    summary: summary?.trim() || undefined,
+    isFirstPage: true,
+    pageNum: 1,
+    totalPages: 1,
+    isLastPage: true,
+  }];
+}
+
+// ============================================================
+// Hook
+// ============================================================
 
 export interface UsePdfPaginationReturn {
   analysisPages: AnalysisPageData[];
@@ -276,7 +217,7 @@ export function usePdfPagination(reportData: ReportData | null): UsePdfPaginatio
   useEffect(() => {
     if (!reportData) return;
 
-    // 计算学情分析分页
+    // 学情分析分页
     const analysis = calculateAnalysisPages(
       reportData.strengths || "",
       reportData.improvements || "",
@@ -284,7 +225,7 @@ export function usePdfPagination(reportData: ReportData | null): UsePdfPaginatio
     );
     setAnalysisPages(analysis);
 
-    // 计算课程规划分页
+    // 课程规划分页
     if (reportData.hasCoursePlan && reportData.coursePlans && reportData.coursePlans.length > 0) {
       const coursePlan = calculateCoursePlanPages(reportData.coursePlans);
       setCoursePlanPages(coursePlan);
@@ -292,9 +233,14 @@ export function usePdfPagination(reportData: ReportData | null): UsePdfPaginatio
       setCoursePlanPages([]);
     }
 
-    // 计算教师建议分页
-    if (reportData.recommendations) {
-      const rec = calculateRecommendationPages(reportData.recommendations);
+    // 教师建议分页（传入总结和照片数量）
+    if (reportData.recommendations || reportData.summary) {
+      const photoCount = reportData.studentPhotos?.length || 0;
+      const rec = calculateRecommendationPages(
+        reportData.recommendations || "",
+        reportData.summary || "",
+        photoCount
+      );
       setRecommendationPages(rec);
     } else {
       setRecommendationPages([]);

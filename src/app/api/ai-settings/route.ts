@@ -7,7 +7,8 @@ import { DEFAULT_COZE_MODEL, getDefaultPrompt } from "@/lib/constants/ai";
 import { isMaskedKey } from "@/lib/ai-client";
 import { isSafeUrlAsync } from "@/lib/ssrf-guard";
 import { getAuthUser } from "@/lib/route-auth";
-import { successResponse, errorResponse, forbiddenError } from "@/lib/api-response";
+import { successResponse, errorResponse } from "@/lib/api-response";
+import { forbiddenError } from "@/lib/api-error";
 
 // API密钥脱敏
 function maskApiKey(key: string): string {

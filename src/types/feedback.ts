@@ -65,6 +65,7 @@ export interface GeneratedReport {
   weaknesses: string;
   recommendations: string;
   summary: string;
+  parseWarning?: boolean;
 }
 
 export interface CoursePlan {
@@ -91,6 +92,34 @@ export interface StudentPhoto {
   id: string;
   url: string;
   file?: File;
+}
+
+// PDF 报告数据（用于 PDF 预览页面和 sessionStorage 传递）
+export interface ReportData {
+  studentId: string;
+  teacherId: string;
+  adminTeacherId?: string;
+  studentName?: string;
+  grade?: string;
+  className?: string;
+  school?: string;
+  theme?: string;
+  feedbackDate: string;
+  teacherName?: string;
+  teacherPhone?: string;
+  adminTeacherName?: string;
+  adminTeacherPhone?: string;
+  campus: string;
+  strengths: string;
+  improvements: string;
+  weaknesses: string;
+  recommendations: string;
+  summary: string;
+  tagRatings: Array<{ name: string; rating: number; note: string }>;
+  hasCoursePlan: boolean;
+  coursePlans: CoursePlan[];
+  currentStageId: string | null;
+  studentPhotos: StudentPhoto[];
 }
 
 export interface CategorizedTags {

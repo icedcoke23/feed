@@ -157,6 +157,20 @@ CREATE TABLE IF NOT EXISTS ai_settings (
 );
 CREATE INDEX IF NOT EXISTS ai_settings_key_idx ON ai_settings(setting_key);
 
+-- 课程阶段专属 AI 提示词表
+CREATE TABLE IF NOT EXISTS course_prompts (
+  id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+  stage_code VARCHAR(50) NOT NULL UNIQUE,
+  system_prompt TEXT,
+  report_structure TEXT,
+  word_limit VARCHAR(20),
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS course_prompts_stage_code_idx ON course_prompts(stage_code);
+CREATE INDEX IF NOT EXISTS course_prompts_active_idx ON course_prompts(is_active);
+
 -- 健康检查表
 CREATE TABLE IF NOT EXISTS health_check (
   id SERIAL PRIMARY KEY,

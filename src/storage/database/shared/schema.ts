@@ -265,6 +265,31 @@ export const aiSettings = pgTable(
   (table) => [index("ai_settings_key_idx").on(table.settingKey)]
 );
 
+// 课程阶段专属 AI 提示词表
+export const coursePrompts = pgTable(
+  "course_prompts",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    stageCode: varchar("stage_code", { length: 50 }).notNull().unique(),
+    systemPrompt: text("system_prompt"),
+    reportStructure: text("report_structure"),
+    wordLimit: varchar("word_limit", { length: 20 }),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("course_prompts_stage_code_idx").on(table.stageCode),
+    index("course_prompts_active_idx").on(table.isActive),
+  ]
+);
+
 // 使用 createSchemaFactory 配置 date coercion
 const { createInsertSchema: createCoercedInsertSchema } = createSchemaFactory({
   coerce: { date: true },
@@ -354,3 +379,5 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type AiSetting = typeof aiSettings.$inferSelect;
 export type InsertAiSetting = z.infer<typeof insertAiSettingSchema>;
+
+export type CoursePrompt = typeof coursePrompts.$inferSelect;

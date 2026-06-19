@@ -1,13 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Pencil, Check, Camera } from "lucide-react";
 import type { ReportData, CoursePlan } from "@/types/feedback";
 import { FreeLayoutPhotoEditor } from "@/components/business/free-layout-photo-editor";
 
-// 内容页padding常量
-const CONTENT_PADDING_TOP = 20; // mm
-const CONTENT_PADDING_BOTTOM = 12; // mm
+// 内容页padding常量（含安全区：背景图占用顶部/底部空间）
+const CONTENT_PADDING_TOP = 30; // mm（安全区，原20mm）
+const CONTENT_PADDING_BOTTOM = 20; // mm（安全区，原12mm）
 const CONTENT_PADDING_LEFT = 15; // mm
 const CONTENT_PADDING_RIGHT = 15; // mm
 
@@ -32,9 +32,11 @@ export interface CoursePlanPageData {
 
 export interface RecommendationPageData {
   content: string;
+  summary?: string;
   isFirstPage: boolean;
   pageNum: number;
   totalPages: number;
+  isLastPage: boolean;
 }
 
 export interface PdfAnalysisPageProps {
@@ -54,6 +56,7 @@ export interface PdfAnalysisPageProps {
   onPhotoReplace: (photoId: string, e: React.ChangeEvent<HTMLInputElement>) => void;
   onPhotoCrop?: (photoId: string, photoUrl: string) => void;
   onOpenPhotoEditor: () => void;
+  onCoursePlanChange?: (planId: string, field: string, value: string) => void;
 }
 
 // 格式化正文内容：段落之间用单个换行分隔，每段开始缩进两字符
@@ -74,6 +77,16 @@ const contentStyle: React.CSSProperties = {
   left: `${CONTENT_PADDING_LEFT}mm`,
   right: `${CONTENT_PADDING_RIGHT}mm`,
   overflow: "hidden",
+};
+
+// 最后一页内容区域样式（允许溢出以显示照片区域）
+const lastPageContentStyle: React.CSSProperties = {
+  position: "absolute",
+  top: `${CONTENT_PADDING_TOP}mm`,
+  bottom: `${CONTENT_PADDING_BOTTOM}mm`,
+  left: `${CONTENT_PADDING_LEFT}mm`,
+  right: `${CONTENT_PADDING_RIGHT}mm`,
+  overflow: "visible",
 };
 
 // 就地编辑区块组件
@@ -107,10 +120,10 @@ function EditableBlock({
   const isEditing = editingField === field && isFirstPage;
 
   return (
-    <div className="mb-4 print:relative">
-      <div className={`${colorClass} p-5 rounded-lg border-l-4 ${borderColorClass} relative group ${isEditing ? 'ring-2 ring-blue-400' : ''}`}>
-        <div className="flex justify-between items-center mb-2">
-          <h4 className={`font-bold text-lg ${borderColorClass.replace('border-', 'text-').replace('-500', '-700')}`}>{label}</h4>
+    <div className="mb-3 print:relative">
+      <div className={`${colorClass} p-4 rounded-lg border-l-4 ${borderColorClass} relative group ${isEditing ? 'ring-2 ring-blue-400' : ''}`}>
+        <div className="flex justify-between items-center mb-1">
+          <h4 className={`font-bold text-base ${borderColorClass.replace('border-', 'text-').replace('-500', '-700')}`}>{label}</h4>
           {editingField !== field && isFirstPage && (
             <button onClick={() => onStartEditing(field, content)} className="print:hidden opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑">
               <Pencil className="h-4 w-4" />
@@ -126,10 +139,101 @@ function EditableBlock({
             </div>
           </div>
         ) : (
-          <div className="text-lg text-gray-700 whitespace-pre-wrap leading-loose">
+          <div className="text-base text-gray-700 whitespace-pre-wrap leading-relaxed">
             {formatContent(content)}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// 可编辑课程规划单元格组件（支持单行/多行，点击变为输入框，失焦或回车保存）
+function EditableCoursePlanCell({
+  planId,
+  field,
+  value,
+  editingCell,
+  editValue,
+  onEditValueChange,
+  onStartEditing,
+  onSaveEdit,
+  onCancelEdit,
+  multiline = false,
+}: {
+  planId: string;
+  field: string;
+  value: string;
+  editingCell: string | null;
+  editValue: string;
+  onEditValueChange: (value: string) => void;
+  onStartEditing: (cellId: string, value: string) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  multiline?: boolean;
+}) {
+  const cellId = `${planId}.${field}`;
+  const isEditing = editingCell === cellId;
+  const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      if (inputRef.current instanceof HTMLInputElement) {
+        inputRef.current.select();
+      }
+    }
+  }, [isEditing]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !multiline) {
+      e.preventDefault();
+      onSaveEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancelEdit();
+    }
+  };
+
+  if (isEditing) {
+    if (multiline) {
+      return (
+        <div className="print:hidden">
+          <textarea
+            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+            value={editValue}
+            onChange={e => onEditValueChange(e.target.value)}
+            onBlur={onSaveEdit}
+            onKeyDown={handleKeyDown}
+            className="w-full px-1 py-0 border border-blue-400 rounded text-base focus:outline-none focus:ring-1 focus:ring-blue-300 resize-y min-h-[60px]"
+          />
+          <div className="text-xs text-gray-400 mt-1">Esc 取消 · 失焦保存</div>
+        </div>
+      );
+    }
+    return (
+      <input
+        ref={inputRef as React.RefObject<HTMLInputElement>}
+        value={editValue}
+        onChange={e => onEditValueChange(e.target.value)}
+        onBlur={onSaveEdit}
+        onKeyDown={handleKeyDown}
+        className="w-full px-1 py-0 border border-blue-400 rounded text-base focus:outline-none focus:ring-1 focus:ring-blue-300"
+      />
+    );
+  }
+
+  return (
+    <div className="group">
+      <div className="flex items-start">
+        <span className={multiline ? "whitespace-pre-wrap flex-1" : "flex-1"}>{value || "-"}</span>
+        <button
+          onClick={() => onStartEditing(cellId, value || "")}
+          className="print:hidden opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 ml-1 p-0.5 flex-shrink-0"
+          title="编辑"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );
@@ -152,7 +256,34 @@ export function PdfAnalysisPage({
   onPhotoReplace,
   onPhotoCrop,
   onOpenPhotoEditor,
+  onCoursePlanChange,
 }: PdfAnalysisPageProps) {
+  // 课程规划单元格编辑状态（独立于正文编辑状态，避免冲突）
+  const [editingCell, setEditingCell] = useState<string | null>(null);
+  const [cellEditValue, setCellEditValue] = useState("");
+
+  const startCellEditing = (cellId: string, value: string) => {
+    setEditingCell(cellId);
+    setCellEditValue(value);
+  };
+
+  const saveCellEdit = () => {
+    if (!editingCell) return;
+    // cellId 格式：planId.field（planId 为 UUID，不含 "."）
+    const dotIndex = editingCell.indexOf('.');
+    if (dotIndex === -1) return;
+    const planId = editingCell.substring(0, dotIndex);
+    const field = editingCell.substring(dotIndex + 1);
+    onCoursePlanChange?.(planId, field, cellEditValue);
+    setEditingCell(null);
+    setCellEditValue("");
+  };
+
+  const cancelCellEdit = () => {
+    setEditingCell(null);
+    setCellEditValue("");
+  };
+
   return (
     <>
       {/* =============== 学情分析页面（智能分页）============== */}
@@ -187,7 +318,7 @@ export function PdfAnalysisPage({
             {page.strengths && (
               <EditableBlock
                 field="strengths"
-                label="学员优点"
+                label={page.strengthsLabel || "学员优点"}
                 colorClass="bg-green-50"
                 borderColorClass="border-green-500"
                 content={page.strengths}
@@ -205,7 +336,7 @@ export function PdfAnalysisPage({
             {page.improvements && (
               <EditableBlock
                 field="improvements"
-                label="能力提升"
+                label={page.improvementsLabel || "能力提升"}
                 colorClass="bg-blue-50"
                 borderColorClass="border-blue-500"
                 content={page.improvements}
@@ -223,7 +354,7 @@ export function PdfAnalysisPage({
             {page.weaknesses && (
               <EditableBlock
                 field="weaknesses"
-                label="需要提升"
+                label={page.weaknessesLabel || "需要提升"}
                 colorClass="bg-orange-50"
                 borderColorClass="border-orange-500"
                 content={page.weaknesses}
@@ -292,7 +423,17 @@ export function PdfAnalysisPage({
                         stageStatus === 'completed' ? 'bg-green-50' : ''
                       }>
                         <td className="border border-gray-400 py-3 px-3 align-top font-medium text-base">
-                          {plan.stage}
+                          <EditableCoursePlanCell
+                            planId={plan.id}
+                            field="stage"
+                            value={plan.stage}
+                            editingCell={editingCell}
+                            editValue={cellEditValue}
+                            onEditValueChange={setCellEditValue}
+                            onStartEditing={startCellEditing}
+                            onSaveEdit={saveCellEdit}
+                            onCancelEdit={cancelCellEdit}
+                          />
                           {stageStatus && (
                             <div className="text-xs mt-1">
                               {stageStatus === 'current' && <span className="text-blue-600 font-medium">[当前阶段]</span>}
@@ -301,9 +442,47 @@ export function PdfAnalysisPage({
                             </div>
                           )}
                         </td>
-                        <td className="border border-gray-400 py-3 px-3 align-top text-base">{plan.theme}</td>
-                        <td className="border border-gray-400 py-3 px-3 align-top whitespace-pre-wrap text-base">{plan.content}</td>
-                        <td className="border border-gray-400 py-3 px-3 align-top whitespace-pre-wrap text-base">{plan.goal}</td>
+                        <td className="border border-gray-400 py-3 px-3 align-top text-base">
+                          <EditableCoursePlanCell
+                            planId={plan.id}
+                            field="theme"
+                            value={plan.theme}
+                            editingCell={editingCell}
+                            editValue={cellEditValue}
+                            onEditValueChange={setCellEditValue}
+                            onStartEditing={startCellEditing}
+                            onSaveEdit={saveCellEdit}
+                            onCancelEdit={cancelCellEdit}
+                          />
+                        </td>
+                        <td className="border border-gray-400 py-3 px-3 align-top whitespace-pre-wrap text-base">
+                          <EditableCoursePlanCell
+                            planId={plan.id}
+                            field="content"
+                            value={plan.content}
+                            editingCell={editingCell}
+                            editValue={cellEditValue}
+                            onEditValueChange={setCellEditValue}
+                            onStartEditing={startCellEditing}
+                            onSaveEdit={saveCellEdit}
+                            onCancelEdit={cancelCellEdit}
+                            multiline
+                          />
+                        </td>
+                        <td className="border border-gray-400 py-3 px-3 align-top whitespace-pre-wrap text-base">
+                          <EditableCoursePlanCell
+                            planId={plan.id}
+                            field="goal"
+                            value={plan.goal}
+                            editingCell={editingCell}
+                            editValue={cellEditValue}
+                            onEditValueChange={setCellEditValue}
+                            onStartEditing={startCellEditing}
+                            onSaveEdit={saveCellEdit}
+                            onCancelEdit={cancelCellEdit}
+                            multiline
+                          />
+                        </td>
                       </tr>
                     );
                   })}
@@ -314,89 +493,114 @@ export function PdfAnalysisPage({
         </div>
       )})}
 
-      {/* =============== 教师阶段性建议（支持分页）============== */}
-      {(recommendationPages.length > 0 ? recommendationPages : [{ content: reportData.recommendations || "暂无建议内容", isFirstPage: true, pageNum: 1, totalPages: 1 }]).map((page, pageIndex) => {
-        const totalRecPages = recommendationPages.length > 0 ? recommendationPages.length : 1;
-        const isLastPage = pageIndex === totalRecPages - 1;
+      {/* =============== 教师阶段性建议（智能1-2页）============== */}
+      {(recommendationPages.length > 0 ? recommendationPages : [{ content: reportData.recommendations || "暂无建议内容", summary: reportData.summary || undefined, isFirstPage: true, pageNum: 1, totalPages: 1, isLastPage: true }]).map((page, pageIndex) => {
         return (
         <div
           key={`recommendation-${pageIndex}`}
-          className={`bg-white shadow-xl print:shadow-none overflow-hidden relative mb-8 print:mb-0 ${
-            !isLastPage ? 'print:break-after-page' : ''
+          className={`bg-white shadow-xl print:shadow-none ${page.isLastPage ? 'overflow-visible' : 'overflow-hidden'} relative mb-8 print:mb-0 ${
+            !page.isLastPage ? 'print:break-after-page' : ''
           }`}
           style={pageStyle}
         >
-          <div style={contentStyle} className="flex flex-col">
-            <div className="mb-4 border-b-2 border-gray-300 pb-2">
+          <div style={page.isLastPage ? lastPageContentStyle : contentStyle} className="flex flex-col">
+            <div className="mb-3 border-b-2 border-gray-300 pb-2">
               <span className="font-bold text-lg text-gray-800">
                 第二部分：教师阶段性建议
                 {!page.isFirstPage && `（续${page.pageNum}/${page.totalPages}）`}
               </span>
             </div>
 
-            <div className={isLastPage ? "" : "flex-1"}>
-              <div className={`bg-yellow-50 p-5 rounded-lg border-l-4 border-yellow-400 relative group ${editingField === 'recommendations' ? 'ring-2 ring-blue-400' : ''}`}>
+            <div className="shrink-0">
+              <div className={`bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400 relative group ${(editingField === 'recommendations' || editingField === 'summary') ? 'ring-2 ring-blue-400' : ''}`}>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm text-gray-400 print:hidden">{editingField === 'recommendations' ? '编辑中...' : ''}</span>
-                  {editingField !== 'recommendations' && page.isFirstPage && (
-                    <button onClick={() => onStartEditing('recommendations', reportData.recommendations)} className="print:hidden opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑建议">
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                  )}
+                  <span className="text-sm text-gray-400 print:hidden">
+                    {editingField === 'recommendations' ? '编辑建议中...' : editingField === 'summary' ? '编辑总结中...' : ''}
+                  </span>
+                  <div className="flex gap-1 print:hidden">
+                    {editingField !== 'summary' && editingField !== 'recommendations' && page.isFirstPage && page.summary && (
+                      <button onClick={() => onStartEditing('summary', reportData.summary)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑总结">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {editingField !== 'recommendations' && editingField !== 'summary' && page.isFirstPage && (
+                      <button onClick={() => onStartEditing('recommendations', reportData.recommendations)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑建议">
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {editingField === 'recommendations' && page.isFirstPage ? (
                   <div className="print:hidden">
+                    <div className="text-sm text-gray-500 mb-1">编辑建议内容：</div>
                     <textarea value={editValue} onChange={e => onEditValueChange(e.target.value)} className="w-full h-48 text-base p-2 border rounded resize-y" />
                     <div className="flex gap-2 mt-2">
                       <button onClick={onSaveEdit} className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"><Check className="h-3.5 w-3.5" />完成</button>
                       <button onClick={onCancelEdit} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-sm hover:bg-gray-300">取消</button>
                     </div>
                   </div>
+                ) : editingField === 'summary' && page.isFirstPage ? (
+                  <div className="print:hidden">
+                    <div className="text-sm text-gray-500 mb-1">编辑总结内容：</div>
+                    <textarea value={editValue} onChange={e => onEditValueChange(e.target.value)} className="w-full h-32 text-base p-2 border rounded resize-y" />
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={onSaveEdit} className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"><Check className="h-3.5 w-3.5" />完成</button>
+                      <button onClick={onCancelEdit} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-sm hover:bg-gray-300">取消</button>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="text-lg text-gray-700 whitespace-pre-wrap leading-loose">
+                  <div className="text-base text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    {page.summary && (
+                      <>
+                        {formatContent(page.summary)}
+                        <div className="my-3 border-t border-yellow-300" />
+                      </>
+                    )}
                     {formatContent(page.content)}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* 学员风采 - 仅在最后一页显示，放在落款之前 */}
-            {isLastPage && (
-              <div className="mt-3">
-                {reportData.studentPhotos && reportData.studentPhotos.length > 0 ? (
-                  <>
-                    <div className="mb-2 flex items-center gap-4">
-                      <span className="font-bold text-base text-gray-800">◆ 学员风采</span>
-                      <span className="text-sm text-gray-500">{reportData.studentName}</span>
-                      {reportData.studentPhotos.length > 6 && (
-                        <span className="text-xs text-gray-400">(共{reportData.studentPhotos.length}张)</span>
-                      )}
-                      <button onClick={onOpenPhotoEditor} className="print:hidden text-gray-400 hover:text-blue-500 p-1 ml-auto" title="编辑照片">
-                        <Camera className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <FreeLayoutPhotoEditor
-                      photos={reportData.studentPhotos.slice(0, 6)}
-                      onPhotoEdit={onPhotoEdit}
-                      onPhotoDelete={onPhotoDelete}
-                      onPhotoReplace={onPhotoReplace}
-                      onPhotoCrop={onPhotoCrop}
-                      containerHeight={reportData.studentPhotos.length <= 2 ? 280 : reportData.studentPhotos.length <= 4 ? 360 : 440}
-                    />
-                  </>
-                ) : (
-                  <button onClick={onOpenPhotoEditor} className="print:hidden w-full border-2 border-dashed border-gray-300 rounded-lg p-3 text-center text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm">
-                    + 添加学员风采照片
-                  </button>
-                )}
-              </div>
-            )}
+            {/* 学员风采 + 落款，照片区域占满剩余空间 */}
+            {page.isLastPage && (
+              <div className="mt-3 flex-1 flex flex-col min-h-0">
+                {/* 学员风采 - 占满剩余空间，至少保留200px高度 */}
+                <div className="flex-1 min-h-[240px] flex flex-col">
+                  {reportData.studentPhotos && reportData.studentPhotos.length > 0 ? (
+                    <>
+                      <div className="mb-2 flex items-center gap-4">
+                        <span className="font-bold text-base text-gray-800">◆ 学员风采</span>
+                        <span className="text-sm text-gray-500">{reportData.studentName}</span>
+                        {reportData.studentPhotos.length > 6 && (
+                          <span className="text-xs text-gray-400">(共{reportData.studentPhotos.length}张)</span>
+                        )}
+                        <button onClick={onOpenPhotoEditor} className="print:hidden text-gray-400 hover:text-blue-500 p-1 ml-auto" title="编辑照片">
+                          <Camera className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        <FreeLayoutPhotoEditor
+                          photos={reportData.studentPhotos.slice(0, 6)}
+                          onPhotoEdit={onPhotoEdit}
+                          onPhotoDelete={onPhotoDelete}
+                          onPhotoReplace={onPhotoReplace}
+                          onPhotoCrop={onPhotoCrop}
+                          fillContainer
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <button onClick={onOpenPhotoEditor} className="print:hidden w-full border-2 border-dashed border-gray-300 rounded-lg p-3 text-center text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm">
+                      + 添加学员风采照片
+                    </button>
+                  )}
+                </div>
 
-            {/* 落款 - 仅在最后一页显示 */}
-            {isLastPage && (
-              <div className="text-center pt-6 mt-auto">
-                <p className="font-bold text-gray-800 text-xl">{reportData.campus || ""}教学部</p>
-                <p className="text-lg text-gray-600 mt-2">{reportData.feedbackDate}</p>
+                {/* 落款：校区与日期合并为一行，固定在底部 */}
+                <div className="text-center pt-4 shrink-0">
+                  <p className="text-base text-gray-600">{reportData.campus || ""}教学部　{reportData.feedbackDate}</p>
+                </div>
               </div>
             )}
           </div>

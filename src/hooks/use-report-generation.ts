@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import type {
   FeedbackStudent,
@@ -44,15 +44,30 @@ export function useReportGeneration({
   const [reviewing, setReviewing] = useState(false);
   const [showStreamingDialog, setShowStreamingDialog] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [metadata, setMetadata] = useState<Record<string, unknown> | null>(null);
+  const generatingRef = useRef(false);
+  const reviewingRef = useRef(false);
 
-  const generateStream = useSSEStream();
-  const reviewStream = useSSEStream();
+  const generateStream = useSSEStream({
+    onMetadata: (meta) => setMetadata((prev) => ({ ...prev, ...meta })),
+    onError: (err) => toast.error(`报告生成失败: ${err.message}`),
+  });
+  const reviewStream = useSSEStream({
+    onMetadata: (meta) => setMetadata((prev) => ({ ...prev, ...meta })),
+    onError: (err) => toast.error(`报告复检失败: ${err.message}`),
+  });
 
-  const handleGenerateReport = useCallback(async () => {
+  const handleGenerateReport = useCallback(async (promptStageCode?: string) => {
     if (!selectedStudentId) return;
+    if (generatingRef.current || generateStream.isStreaming) {
+      console.warn("[Generate] 已有生成任务进行中，忽略重复请求");
+      return;
+    }
+    generatingRef.current = true;
 
     setGenerating(true);
     setShowStreamingDialog(true);
+    setMetadata(null);
 
     const student = students.find((s) => s.id === selectedStudentId);
     const selectedTags = tags.filter((t) => tagRatings[t.id]);
@@ -74,7 +89,7 @@ export function useReportGeneration({
         name: tag.name,
         category: tag.category,
         rating: rating.rating,
-        note: rating.note || autoDesc,
+        note: rating.note || autoDesc || "",
       };
     });
 
@@ -95,22 +110,32 @@ export function useReportGeneration({
             .join("；")
         : undefined;
 
-    const result = await generateStream.startStream("/api/generate", {
-      studentName: student?.name,
-      grade: student?.grade,
-      className: student?.class_name,
-      theme: coursePlans.length > 0 ? coursePlans[0].theme : undefined,
-      themeCategory: coursePlans.length > 0 ? coursePlans[0].stage : undefined,
-      courseStageInfo,
-      tagInfo,
-      history: feedbackHistory.slice(0, 3),
-    });
+    const generateBody = Object.fromEntries(
+      Object.entries({
+        studentName: student?.name,
+        grade: student?.grade,
+        className: student?.class_name,
+        theme: coursePlans.length > 0 ? coursePlans[0].theme : undefined,
+        themeCategory: coursePlans.length > 0 ? coursePlans[0].stage : undefined,
+        courseStageInfo,
+        tagInfo,
+        history: feedbackHistory.slice(0, 3),
+        currentStageId: currentStageId || undefined,
+        promptStageCode,
+      }).filter(([, v]) => v !== undefined && v !== null)
+    );
+
+    console.log("[Generate] request body:", generateBody);
+
+    const result = await generateStream.startStream("/api/generate", generateBody);
 
     if (result) {
       const sections = parseGeneratedContent(result);
 
-      if (!sections.strengths && !sections.improvements && !sections.recommendations) {
+      if (!sections.strengths && !sections.improvements && !sections.recommendations && !sections.summary) {
         toast.warning("报告生成完成，但内容解析可能不完整，请检查并手动调整");
+      } else if (!sections.recommendations || !sections.summary) {
+        toast.warning("报告生成完成，但教学建议或总结可能缺失，请检查并补充");
       } else {
         toast.success("报告生成完成");
       }
@@ -126,30 +151,45 @@ export function useReportGeneration({
     }
 
     setGenerating(false);
+    generatingRef.current = false;
   }, [selectedStudentId, students, tags, tagRatings, coursePlans, currentStageId, feedbackHistory, setGeneratedReport, generateStream]);
 
-  const handleReviewReport = useCallback(async () => {
+  const handleReviewReport = useCallback(async (promptStageCode?: string) => {
     if (!generatedReport) return;
+    if (reviewingRef.current || reviewStream.isStreaming) {
+      console.warn("[Review] 已有复检任务进行中，忽略重复请求");
+      return;
+    }
+    reviewingRef.current = true;
 
     setReviewing(true);
     setShowReviewDialog(true);
+    setMetadata(null);
 
     const student = students.find((s) => s.id === selectedStudentId);
     const theme = themes.find((t) => t.id === selectedThemeId);
 
-    const result = await reviewStream.startStream("/api/generate/review", {
-      studentName: student?.name,
-      theme: theme?.name,
-      report: generatedReport,
-      tagInfo: Object.entries(tagRatings).map(([tagId, data]) => {
-        const tag = tags.find((t) => t.id === tagId);
-        return {
-          name: tag?.name || tagId.replace(/^custom-/, ""),
-          rating: data.rating,
-          note: data.note,
-        };
-      }),
-    });
+    const reviewBody = Object.fromEntries(
+      Object.entries({
+        studentName: student?.name,
+        theme: theme?.name,
+        report: generatedReport,
+        tagInfo: Object.entries(tagRatings).map(([tagId, data]) => {
+          const tag = tags.find((t) => t.id === tagId);
+          return {
+            name: tag?.name || tagId.replace(/^custom-/, ""),
+            rating: data.rating,
+            note: data.note,
+          };
+        }),
+        currentStageId: currentStageId || undefined,
+        promptStageCode,
+      }).filter(([, v]) => v !== undefined && v !== null)
+    );
+
+    console.log("[Review] request body:", reviewBody);
+
+    const result = await reviewStream.startStream("/api/generate/review", reviewBody);
 
     if (result) {
       const sections = parseGeneratedContent(result);
@@ -166,7 +206,8 @@ export function useReportGeneration({
     }
 
     setReviewing(false);
-  }, [generatedReport, students, selectedStudentId, themes, selectedThemeId, tagRatings, tags, setGeneratedReport, reviewStream]);
+    reviewingRef.current = false;
+  }, [generatedReport, students, selectedStudentId, themes, selectedThemeId, tagRatings, tags, currentStageId, setGeneratedReport, reviewStream]);
 
   return {
     generating,
@@ -185,5 +226,6 @@ export function useReportGeneration({
     setShowReviewDialog,
     handleGenerateReport,
     handleReviewReport,
+    metadata,
   };
 }

@@ -20,6 +20,15 @@ export function handleDbError(error: unknown, context: string = "操作"): NextR
   } else if (typeof error === 'object' && error !== null && 'message' in error) {
     message = String((error as { message: unknown }).message);
   }
+
+  // 针对常见 schema 缺失给出可操作的提示
+  if (message.includes("Could not find the 'metadata' column") || message.includes("in the schema cache")) {
+    return apiError(
+      `${context}失败: 数据库表缺少 metadata 列或 PostgREST 缓存未刷新。请在 Supabase SQL Editor 中执行 scripts/migrate-add-columns.sql，然后执行 NOTIFY pgrst, 'reload schema';`,
+      500
+    );
+  }
+
   return apiError(`${context}失败: ${message}`, 500);
 }
 

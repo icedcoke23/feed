@@ -34,8 +34,8 @@ export function useClassActions(
     setEditingClass(cls);
     setNewClass({
       name: cls.name,
-      grade: cls.grade,
-      schedule: cls.schedule,
+      grade: cls.grade ?? "",
+      schedule: cls.schedule ?? "",
       teacherId: cls.teacher?.id || "",
     });
     setIsEditClassDialogOpen(true);

@@ -9,11 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
-  Download,
   Calendar,
   User,
   School,
-  Loader2,
   Pencil,
 } from "lucide-react";
 import Link from "next/link";
@@ -28,7 +26,6 @@ export default function FeedbackDetailPage() {
   const [feedback, setFeedback] = useState<FeedbackDetail | null>(null);
   const [student, setStudent] = useState<Pick<Student, "id" | "name" | "grade" | "school"> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchFeedback();
@@ -56,44 +53,6 @@ export default function FeedbackDetailPage() {
       toast.error("获取反馈报告失败，请刷新页面重试");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleExportWord = async () => {
-    setExporting(true);
-    try {
-      const response = await fetch("/api/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studentName: student?.name,
-          grade: student?.grade,
-          school: student?.school,
-          teacherName: "授课教师",
-          periodStart: feedback?.period_start,
-          periodEnd: feedback?.period_end,
-          aiReport: feedback?.ai_report,
-          strengths: feedback?.strengths,
-          improvements: feedback?.improvements,
-          weaknesses: feedback?.weaknesses,
-          teachingPlan: feedback?.teaching_plan,
-          suggestions: feedback?.suggestions,
-        }),
-      });
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${student?.name}_教学反馈报告.docx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error("Failed to export:", error);
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -156,19 +115,6 @@ export default function FeedbackDetailPage() {
                 编辑
               </Button>
             </Link>
-            <Button onClick={handleExportWord} disabled={exporting}>
-              {exporting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  导出中...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  导出Word
-                </>
-              )}
-            </Button>
           </div>
         </div>
 

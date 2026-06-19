@@ -480,7 +480,12 @@ export function useAISettings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(aiSettings),
+        body: JSON.stringify({
+          api_key: aiSettings.api_key,
+          base_url: aiSettings.base_url,
+          model_id: aiSettings.model_id,
+          use_custom_ai: aiSettings.use_custom_ai === "true",
+        }),
       });
 
       const contentType = response.headers.get("content-type") || "";

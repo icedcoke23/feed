@@ -12,9 +12,9 @@ import type {
   CategorizedTags,
   FeedbackStudent,
   FeedbackTeacher,
+  ReportData,
 } from "@/types/feedback";
-import { compressImage } from "@/utils/compress-image";
-import { useDraftSave } from "@/hooks/use-draft-save";
+import { useDraftSave, type DraftData } from "@/hooks/use-draft-save";
 
 interface UseFeedbackFormOptions {
   tags: TagItem[];
@@ -65,7 +65,6 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
 
   // 学员风采照片
   const [studentPhotos, setStudentPhotos] = useState<StudentPhoto[]>([]);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // 生成的报告内容
   const [generatedReport, setGeneratedReport] = useState<GeneratedReport | null>(null);
@@ -86,7 +85,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
 
   const selectedTagsCount = Object.keys(tagRatings).length;
 
-  // 草稿保存 hook
+  // 草稿保存 hook（照片只保留可序列化的 id/url，丢弃 File 对象）
   const draftData = useMemo(() => ({
     selectedStudentId,
     selectedThemeId,
@@ -98,41 +97,100 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
     hasCoursePlan,
     coursePlans,
     currentStageId,
+    studentPhotos: studentPhotos.map(({ id, url }) => ({ id, url })),
   }), [
     selectedStudentId, selectedThemeId, selectedTeacherId, selectedAdminTeacherId,
     feedbackDate, tagRatings, generatedReport, hasCoursePlan, coursePlans, currentStageId,
+    studentPhotos,
   ]);
 
   const { hasDraft, restoreDraft, clearDraft } = useDraftSave(
     isEditMode ? null : draftData
   );
 
-  // 从sessionStorage恢复数据
+  // 从 sessionStorage/localStorage 恢复数据（优先从 PDF 页返回时写入的 tempReportData）
   useEffect(() => {
-    if (restoreFromSession) {
-      const draft = restoreDraft();
-      if (draft) {
-        setSelectedStudentId(draft.selectedStudentId || "");
-        setSelectedThemeId(draft.selectedThemeId || "");
-        setFeedbackDate(draft.feedbackDate || new Date().toISOString().split("T")[0]);
-        if (draft.tagRatings) {
-          setTagRatings(draft.tagRatings as Record<string, TagRating>);
-        }
-        if (draft.generatedReport) {
-          setGeneratedReport(draft.generatedReport as GeneratedReport);
-        }
-        if (draft.hasCoursePlan !== undefined) {
-          setHasCoursePlan(draft.hasCoursePlan);
-        }
-        if (draft.coursePlans) {
-          setCoursePlans(draft.coursePlans as CoursePlan[]);
-        }
-        if (draft.currentStageId) {
-          setCurrentStageId(draft.currentStageId);
-        }
+    if (!restoreFromSession) return;
+
+    const applyDraft = (draft: DraftData) => {
+      setSelectedStudentId(draft.selectedStudentId || "");
+      setSelectedThemeId(draft.selectedThemeId || "");
+      setFeedbackDate(draft.feedbackDate || new Date().toISOString().split("T")[0]);
+      if (draft.tagRatings) {
+        setTagRatings(draft.tagRatings as Record<string, TagRating>);
       }
+      if (draft.generatedReport) {
+        setGeneratedReport(draft.generatedReport as GeneratedReport);
+      }
+      if (draft.hasCoursePlan !== undefined) {
+        setHasCoursePlan(draft.hasCoursePlan);
+      }
+      if (draft.coursePlans) {
+        setCoursePlans(draft.coursePlans as CoursePlan[]);
+      }
+      if (draft.currentStageId) {
+        setCurrentStageId(draft.currentStageId);
+      }
+      if (draft.studentPhotos) {
+        setStudentPhotos(draft.studentPhotos.map((p) => ({ id: p.id, url: p.url })));
+      }
+    };
+
+    try {
+      const tempData = localStorage.getItem("tempReportData");
+      if (tempData) {
+        const parsed = JSON.parse(tempData) as ReportData;
+        setSelectedStudentId(parsed.studentId || "");
+        setSelectedTeacherId(parsed.teacherId || "");
+        setSelectedAdminTeacherId(parsed.adminTeacherId || "");
+        setSelectedThemeId(themes.find((t) => t.name === parsed.theme)?.id || "");
+        setFeedbackDate(parsed.feedbackDate || new Date().toISOString().split("T")[0]);
+        if (parsed.tagRatings && Array.isArray(parsed.tagRatings)) {
+          const ratings: Record<string, TagRating> = {};
+          parsed.tagRatings.forEach((tag) => {
+            const isCustom = !tags.some((t) => t.name === tag.name);
+            const tagId = isCustom
+              ? `custom-${tag.name}`
+              : tags.find((t) => t.name === tag.name)?.id;
+            if (tagId) {
+              ratings[tagId] = { rating: tag.rating, note: tag.note, isCustom };
+            }
+          });
+          setTagRatings(ratings);
+        }
+        if (parsed.strengths || parsed.improvements || parsed.weaknesses || parsed.recommendations || parsed.summary) {
+          setGeneratedReport({
+            strengths: parsed.strengths || "",
+            improvements: parsed.improvements || "",
+            weaknesses: parsed.weaknesses || "",
+            recommendations: parsed.recommendations || "",
+            summary: parsed.summary || "",
+          });
+        }
+        if (parsed.hasCoursePlan !== undefined) {
+          setHasCoursePlan(parsed.hasCoursePlan);
+        }
+        if (parsed.coursePlans) {
+          setCoursePlans(parsed.coursePlans);
+        }
+        if (parsed.currentStageId) {
+          setCurrentStageId(parsed.currentStageId);
+        }
+        if (parsed.studentPhotos) {
+          setStudentPhotos(parsed.studentPhotos.map((p) => ({ id: p.id, url: p.url })));
+        }
+        localStorage.removeItem("tempReportData");
+        return;
+      }
+    } catch {
+      // ignore
     }
-  }, [restoreFromSession, restoreDraft]);
+
+    const draft = restoreDraft();
+    if (draft) {
+      applyDraft(draft);
+    }
+  }, [restoreFromSession, restoreDraft, tags, themes]);
 
   // 编辑模式：从 API 加载已有反馈数据并预填表单
   useEffect(() => {
@@ -224,6 +282,29 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
           }
         }
 
+        // 预填教务教师
+        if (metadata?.admin_teacher_name && adminTeachers.length > 0) {
+          const adminTeacher = adminTeachers.find((t) => t.name === metadata.admin_teacher_name);
+          if (adminTeacher && !cancelled) {
+            setSelectedAdminTeacherId(adminTeacher.id);
+          }
+        }
+
+        // 从 metadata 恢复电话号码作为回退（当教师不在数组中时仍可使用）
+        if (metadata?.teacher_phone && !cancelled) {
+          // 如果已找到教师但没有电话，或教师未找到，存储 metadata 中的电话
+          const foundTeacher = teachers.find((t) => t.name === metadata.teacher_name) || adminTeachers.find((t) => t.name === metadata.teacher_name);
+          if (!foundTeacher || !foundTeacher.phone) {
+            console.info(`[useFeedbackForm] 从 metadata 恢复教师电话: ${metadata.teacher_phone}`);
+          }
+        }
+        if (metadata?.admin_teacher_phone && !cancelled) {
+          const foundAdmin = adminTeachers.find((t) => t.name === metadata.admin_teacher_name) || teachers.find((t) => t.name === metadata.admin_teacher_name);
+          if (!foundAdmin || !foundAdmin.phone) {
+            console.info(`[useFeedbackForm] 从 metadata 恢复教务电话: ${metadata.admin_teacher_phone}`);
+          }
+        }
+
         // 预填主题
         if (metadata?.theme && themes.length > 0) {
           const theme = themes.find((t) => t.name === metadata.theme);
@@ -262,7 +343,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
     return () => {
       cancelled = true;
     };
-  }, [editIdFromUrl, tags, teachers, themes]);
+  }, [editIdFromUrl, tags, teachers, adminTeachers, themes]);
 
   // 从PDF页面返回时恢复数据
   useEffect(() => {
@@ -354,10 +435,9 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
     if (!customTagName.trim()) return;
 
     setAddingCustomTag(true);
+    // 跳过 AI 解析，直接使用前端选择的分类
+    const category = customTagCategory || "strength";
     try {
-      // 跳过 AI 解析，直接使用前端选择的分类
-      const category = customTagCategory || "strength";
-
       // 10秒超时保护
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -386,13 +466,13 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
         setTags((prev) => [...prev, savedTag.data]);
         setTagRatings((prev) => ({
           ...prev,
-          [savedTag.data.id]: { rating: customTagRating, note: customTagNote, isCustom: true, category },
+          [savedTag.data.id]: { rating: customTagRating, note: customTagNote, isCustom: true, category: customTagCategory },
         }));
       } else {
         const tempId = `custom-${Date.now()}`;
         setTagRatings((prev) => ({
           ...prev,
-          [tempId]: { rating: customTagRating, note: customTagNote, isCustom: true, category },
+          [tempId]: { rating: customTagRating, note: customTagNote, isCustom: true, category: customTagCategory },
         }));
       }
 
@@ -404,7 +484,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
       const tempId = `custom-${Date.now()}`;
       setTagRatings((prev) => ({
         ...prev,
-        [tempId]: { rating: customTagRating, note: customTagNote, isCustom: true, category },
+        [tempId]: { rating: customTagRating, note: customTagNote, isCustom: true, category: customTagCategory },
       }));
       setCustomTagName("");
       setCustomTagNote("");
@@ -413,96 +493,6 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
       setAddingCustomTag(false);
     }
   }, [customTagName, customTagNote, customTagRating, customTagCategory]);
-
-  // 照片操作
-  const handlePhotoUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
-
-      const remainingSlots = 10 - studentPhotos.length;
-      if (remainingSlots <= 0) {
-        toast.error("最多只能上传10张照片");
-        return;
-      }
-
-      const filesToProcess = Array.from(files).slice(0, remainingSlots);
-      setUploadingPhoto(true);
-
-      try {
-        const newPhotos: StudentPhoto[] = [];
-
-        await Promise.all(
-          filesToProcess.map(async (file) => {
-            if (!file.type.startsWith("image/")) {
-              toast.error(`${file.name} 不是图片文件`);
-              return;
-            }
-
-            try {
-              const compressedFile = await compressImage(file, 1200, 0.7);
-              const objectUrl = URL.createObjectURL(compressedFile);
-              newPhotos.push({
-                id: `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-                url: objectUrl,
-                file: compressedFile,
-              });
-            } catch (error) {
-              console.error(`压缩图片 ${file.name} 失败:`, error);
-              toast.error(`${file.name} 处理失败`);
-            }
-          })
-        );
-
-        if (newPhotos.length > 0) {
-          setStudentPhotos((prev) => [...prev, ...newPhotos]);
-          toast.success(`成功添加 ${newPhotos.length} 张照片`);
-        }
-      } catch (error) {
-        console.error("Photo upload error:", error);
-        toast.error("上传失败，请重试");
-      } finally {
-        setUploadingPhoto(false);
-        e.target.value = "";
-      }
-    },
-    [studentPhotos.length]
-  );
-
-  const handleRemovePhoto = useCallback((id: string) => {
-    setStudentPhotos((prev) => {
-      const target = prev.find((p) => p.id === id);
-      if (target?.url?.startsWith("blob:")) {
-        URL.revokeObjectURL(target.url);
-      }
-      return prev.filter((p) => p.id !== id);
-    });
-  }, []);
-
-  // 裁剪后添加照片
-  const handleAddCroppedPhoto = useCallback(
-    (croppedDataUrl: string) => {
-      if (studentPhotos.length >= 10) {
-        toast.error("最多只能上传10张照片");
-        return;
-      }
-      const newPhoto: StudentPhoto = {
-        id: `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        url: croppedDataUrl,
-      };
-      setStudentPhotos((prev) => [...prev, newPhoto]);
-      toast.success("照片添加成功");
-    },
-    [studentPhotos.length]
-  );
-
-  // 裁剪后替换照片
-  const handleReplacePhoto = useCallback((id: string, croppedDataUrl: string) => {
-    setStudentPhotos((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, url: croppedDataUrl, file: undefined } : p))
-    );
-    toast.success("照片替换成功");
-  }, []);
 
   // 保存状态
   const [saving, setSaving] = useState(false);
@@ -519,6 +509,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
       const student = students.find((s) => s.id === selectedStudentId);
       const theme = themes.find((t) => t.id === selectedThemeId);
       const teacher = teachers.find((t) => t.id === selectedTeacherId);
+      const adminTeacher = adminTeachers.find((t) => t.id === selectedAdminTeacherId);
 
       // 构建标签评分数据
       const tagRatingsData: Record<string, number> = {};
@@ -548,6 +539,9 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
       const metadata: Record<string, unknown> = {
         student_name: student?.name,
         teacher_name: teacher?.name,
+        teacher_phone: teacher?.phone,
+        admin_teacher_name: adminTeacher?.name,
+        admin_teacher_phone: adminTeacher?.phone,
         theme: theme?.name,
         tag_ratings: tagRatingsData,
         tag_ratings_detail: tagRatingsDetail,
@@ -566,6 +560,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
           weaknesses: generatedReport.weaknesses,
           recommendations: generatedReport.recommendations,
         },
+        student_photos: studentPhotos.map(({ id, url }) => ({ id, url })),
       };
 
       // 构建请求体
@@ -634,7 +629,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
     } finally {
       setSaving(false);
     }
-  }, [selectedStudentId, generatedReport, students, teachers, themes, selectedThemeId, selectedTeacherId, selectedAdminTeacherId, feedbackDate, tagRatings, tags, hasCoursePlan, coursePlans, currentStageId, editId, clearDraft]);
+  }, [selectedStudentId, generatedReport, students, teachers, themes, selectedThemeId, selectedTeacherId, selectedAdminTeacherId, feedbackDate, tagRatings, tags, hasCoursePlan, coursePlans, currentStageId, editId, clearDraft, studentPhotos]);
 
   // 步骤导航
   const canProceed = useCallback(() => {
@@ -721,11 +716,6 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
     // 照片
     studentPhotos,
     setStudentPhotos,
-    uploadingPhoto,
-    handlePhotoUpload,
-    handleRemovePhoto,
-    handleAddCroppedPhoto,
-    handleReplacePhoto,
     // 保存
     saving,
     saveFeedback,

@@ -1,10 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabaseClient } from "@/storage/database/supabase-client";
 import { validateInput } from "@/lib/validations";
-import { insertFeedbackSchema } from "@/storage/database/shared/schema";
 import { handleDbError } from "@/lib/api-error";
 import { getAuthUser, canTeacherAccessStudent } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { z } from "zod";
+
+// 学情分析项 schema：与数据库 jsonb 列保持一致
+const feedbackItemSchema = z.object({
+  tag: z.string(),
+  description: z.string().optional(),
+});
+
+// 反馈更新 schema：接受对象数组，同时兼容 camelCase 和 snake_case
+const updateFeedbackSchema = z.object({
+  strengths: z.array(feedbackItemSchema).optional(),
+  improvements: z.array(feedbackItemSchema).optional(),
+  weaknesses: z.array(feedbackItemSchema).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  status: z.string().optional(),
+  suggestions: z.string().optional(),
+  aiReport: z.string().optional(),
+  ai_report: z.string().optional(),
+  periodStart: z.string().optional(),
+  period_start: z.string().optional(),
+  periodEnd: z.string().optional(),
+  period_end: z.string().optional(),
+  teachingPlan: z.string().optional(),
+  teaching_plan: z.string().optional(),
+  workInfo: z.string().optional(),
+  work_info: z.string().optional(),
+  abilityScores: z.record(z.string(), z.number()).optional(),
+  ability_scores: z.record(z.string(), z.number()).optional(),
+});
 
 // GET /api/feedbacks/[id] - 获取单个反馈详情
 export async function GET(
@@ -78,7 +106,7 @@ export async function PUT(
     }
   }
 
-  const result = validateInput(insertFeedbackSchema.partial(), body);
+  const result = validateInput(updateFeedbackSchema, body);
   if ("error" in result) return result.error;
   const validatedData = result.data;
 
@@ -91,24 +119,39 @@ export async function PUT(
       return handleDbError(versionError, "递增版本号");
     }
 
+    // 仅更新传入的字段，避免 undefined 覆盖已有数据
+    const updatePayload: Record<string, unknown> = {
+      ...(validatedData.strengths !== undefined && { strengths: validatedData.strengths }),
+      ...(validatedData.improvements !== undefined && { improvements: validatedData.improvements }),
+      ...(validatedData.weaknesses !== undefined && { weaknesses: validatedData.weaknesses }),
+      ...(validatedData.teachingPlan !== undefined || validatedData.teaching_plan !== undefined
+        ? { teaching_plan: validatedData.teachingPlan || validatedData.teaching_plan }
+        : {}),
+      ...(validatedData.suggestions !== undefined && { suggestions: validatedData.suggestions }),
+      ...(validatedData.aiReport !== undefined || validatedData.ai_report !== undefined
+        ? { ai_report: validatedData.aiReport || validatedData.ai_report }
+        : {}),
+      ...(validatedData.metadata !== undefined && { metadata: validatedData.metadata }),
+      ...(validatedData.workInfo !== undefined || validatedData.work_info !== undefined
+        ? { work_info: validatedData.workInfo || validatedData.work_info }
+        : {}),
+      ...(validatedData.abilityScores !== undefined || validatedData.ability_scores !== undefined
+        ? { ability_scores: validatedData.abilityScores || validatedData.ability_scores }
+        : {}),
+      ...(validatedData.status !== undefined && { status: validatedData.status }),
+      ...(validatedData.periodStart !== undefined || validatedData.period_start !== undefined
+        ? { period_start: validatedData.periodStart || validatedData.period_start }
+        : {}),
+      ...(validatedData.periodEnd !== undefined || validatedData.period_end !== undefined
+        ? { period_end: validatedData.periodEnd || validatedData.period_end }
+        : {}),
+      version: newVersion,
+      updated_at: new Date().toISOString(),
+    };
+
     const { data, error } = await client
       .from("feedbacks")
-      .update({
-        strengths: validatedData.strengths,
-        improvements: validatedData.improvements,
-        weaknesses: validatedData.weaknesses,
-        teaching_plan: validatedData.teachingPlan,
-        suggestions: validatedData.suggestions,
-        ai_report: validatedData.aiReport,
-        metadata: validatedData.metadata,
-        work_info: validatedData.workInfo,
-        ability_scores: validatedData.abilityScores,
-        status: validatedData.status,
-        period_start: validatedData.periodStart,
-        period_end: validatedData.periodEnd,
-        version: newVersion,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", id)
       .select()
       .single();

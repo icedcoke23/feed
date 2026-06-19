@@ -9,15 +9,21 @@ import { successResponse, errorResponse, paginatedResponse } from "@/lib/api-res
 import { parsePagination, getOffset, buildPaginationMeta } from "@/lib/pagination";
 import { withLogging } from "@/lib/api-logger";
 
+// 学情分析项 schema：与数据库 jsonb 列保持一致
+const feedbackItemSchema = z.object({
+  tag: z.string(),
+  description: z.string().optional(),
+});
+
 // 反馈创建 schema：核心字段必填，同时兼容 camelCase 和 snake_case
 const createFeedbackSchema = z.object({
   studentId: z.string().min(1, "缺少学员ID").optional(),
   student_id: z.string().min(1, "缺少学员ID").optional(),
   teacherId: z.string().min(1, "缺少教师ID").optional(),
   teacher_id: z.string().min(1, "缺少教师ID").optional(),
-  strengths: z.array(z.string()).optional(),
-  improvements: z.array(z.string()).optional(),
-  weaknesses: z.array(z.string()).optional(),
+  strengths: z.array(feedbackItemSchema).optional(),
+  improvements: z.array(feedbackItemSchema).optional(),
+  weaknesses: z.array(feedbackItemSchema).optional(),
   teachingPlan: z.string().optional(),
   teaching_plan: z.string().optional(),
   course_plans: z.string().optional(),
@@ -51,6 +57,8 @@ const createFeedbackSchema = z.object({
   ability_scores: z.record(z.string(), z.number()).optional(),
   // 照片数据
   student_photos: z.array(z.object({ id: z.string(), url: z.string() })).optional(),
+  // 元数据（前端已组装好的完整对象，会与其他字段合并）
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).refine(
   (data) => data.studentId || data.student_id,
   { message: "缺少学员ID" }
@@ -281,6 +289,12 @@ export const POST = withLogging(async (request: NextRequest) => {
         insertData.metadata = metadataObj;
         insertData.ai_report = null;
       }
+    }
+
+    // 合并前端传入的完整 metadata，确保照片、ai_report_sections 等字段不丢失
+    if (validatedData.metadata && typeof validatedData.metadata === "object") {
+      Object.assign(metadataObj, validatedData.metadata);
+      insertData.metadata = metadataObj;
     }
 
     const { data, error } = await client

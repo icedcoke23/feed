@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { getServerSupabaseClient } from "@/storage/database/supabase-client";
 import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
-import { successResponse, errorResponse, forbiddenError } from "@/lib/api-response";
+import { successResponse, errorResponse } from "@/lib/api-response";
+import { forbiddenError } from "@/lib/api-error";
 import { clearAllData } from "@/lib/data-utils";
 
 // DELETE /api/data/clear - 清空所有业务数据

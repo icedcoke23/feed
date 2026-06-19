@@ -16,6 +16,7 @@ export interface DraftData {
   hasCoursePlan?: boolean | null;
   coursePlans?: unknown[];
   currentStageId?: string | null;
+  studentPhotos?: Array<{ id: string; url: string }>;
   savedAt?: string;
 }
 

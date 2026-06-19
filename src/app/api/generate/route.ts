@@ -3,10 +3,12 @@ import { z } from "zod";
 import { getAISettings, sanitizeUserInput } from "@/lib/ai-client";
 import { validateInput } from "@/lib/validations";
 import { getDomainPrompt, extractEvaluationDimensions } from "@/lib/constants/ai";
+import { getCoursePromptByStageCode } from "@/lib/course-prompt";
 import https from "https";
 import http from "http";
 import { isSafeUrlAsync } from "@/lib/ssrf-guard";
 import { getAuthUser } from "@/lib/route-auth";
+import { getServerSupabaseClient } from "@/storage/database/supabase-client";
 import { errorResponse } from "@/lib/api-response";
 import { unauthorizedError } from "@/lib/api-error";
 
@@ -20,16 +22,20 @@ const generateSchema = z.object({
     name: z.string().max(50),
     category: z.enum(["strength", "improvement", "weakness"]),
     rating: z.number().min(1).max(5),
-    note: z.string().max(200).optional(),
+    note: z.string().max(200).optional().nullable(),
   })).optional(),
   ratings: z.record(z.string(), z.number().min(1).max(5)).optional(),
   notes: z.string().max(2000).optional(),
   courseStageInfo: z.string().max(1000).optional(),
   historyFeedback: z.string().max(3000).optional(),
   history: z.array(z.any()).optional(),
+  // 课程阶段提示词相关参数（可选）
+  promptStageCode: z.string().max(50).optional(),
+  currentStageId: z.string().max(50).optional(),
+  level: z.string().max(50).optional(),
 });
 
-function formatTagWithRating(tags: Array<{ name: string; rating: number; note?: string }>): string {
+function formatTagWithRating(tags: Array<{ name: string; rating: number; note?: string | null }>): string {
   if (!tags || tags.length === 0) return "本阶段暂无相关记录。";
   return tags.map((t) => {
     const stars = "⭐".repeat(t.rating || 3);
@@ -52,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
     const result = validateInput(generateSchema, body);
     if ("error" in result) return result.error;
-    const { studentName, grade, className, theme, themeCategory, courseStageInfo, tagInfo, history } = result.data;
+    const { studentName, grade, className, theme, themeCategory, courseStageInfo, tagInfo, history, promptStageCode, currentStageId, level } = result.data;
 
     let aiSettings: Awaited<ReturnType<typeof getAISettings>>;
     try {
@@ -61,10 +67,63 @@ export async function POST(request: NextRequest) {
       return errorResponse("获取AI配置失败", 500);
     }
 
-    const domainPrompt = getDomainPrompt(theme || themeCategory);
-    const systemPrompt = aiSettings?.systemPrompt
-      ? `${aiSettings.systemPrompt}\n\n【补充评价维度】\n${extractEvaluationDimensions(domainPrompt)}`
-      : domainPrompt;
+    // 解析课程阶段提示词：优先使用显式传入的 promptStageCode，
+    // 否则尝试从 currentStageId 或 theme+level 推导 stage_code
+    const supabase = getServerSupabaseClient();
+    let courseSystemPrompt: string | null = null;
+    let courseReportStructure: string | null = null;
+    let stageCodeToQuery = promptStageCode;
+
+    if (!stageCodeToQuery && currentStageId) {
+      const { data: stageData } = await supabase
+        .from("course_stages")
+        .select("stage_code")
+        .eq("id", currentStageId)
+        .or("is_active.eq.true,is_active.is.null")
+        .maybeSingle();
+      if (stageData?.stage_code) {
+        stageCodeToQuery = stageData.stage_code;
+      }
+    }
+
+    if (!stageCodeToQuery && theme && level) {
+      const { data: stageData } = await supabase
+        .from("course_stages")
+        .select("stage_code")
+        .eq("theme", theme)
+        .eq("level", level)
+        .or("is_active.eq.true,is_active.is.null")
+        .limit(1)
+        .maybeSingle();
+      if (stageData?.stage_code) {
+        stageCodeToQuery = stageData.stage_code;
+      }
+    }
+
+    if (stageCodeToQuery) {
+      const coursePrompt = await getCoursePromptByStageCode(supabase, stageCodeToQuery);
+      if (coursePrompt) {
+        courseSystemPrompt = coursePrompt.system_prompt;
+        courseReportStructure = coursePrompt.report_structure;
+      }
+    }
+
+    // 组装系统提示词：若找到课程阶段提示词则使用其 system_prompt + report_structure，
+    // 否则回退到 getDomainPrompt(theme)；保留与 ai_settings.systemPrompt 的组合逻辑
+    let systemPrompt: string;
+    if (courseSystemPrompt) {
+      const coursePromptText = courseReportStructure
+        ? `${courseSystemPrompt}\n\n${courseReportStructure}`
+        : courseSystemPrompt;
+      systemPrompt = aiSettings?.systemPrompt
+        ? `${aiSettings.systemPrompt}\n\n${coursePromptText}`
+        : coursePromptText;
+    } else {
+      const domainPrompt = getDomainPrompt(theme || themeCategory);
+      systemPrompt = aiSettings?.systemPrompt
+        ? `${aiSettings.systemPrompt}\n\n【补充评价维度】\n${extractEvaluationDimensions(domainPrompt)}`
+        : domainPrompt;
+    }
 
     const safeName = sanitizeUserInput(studentName);
     const safeGrade = grade ? sanitizeUserInput(grade) : "未填写";
@@ -86,6 +145,9 @@ export async function POST(request: NextRequest) {
         userMessage += `\n\n### 第${i + 1}次反馈\n- 主题：${fb.teaching_theme || "未记录"}\n- 评分：${fb.overall_rating || "未评分"}星`;
       });
     }
+
+    // 强制输出格式，确保前端能正确解析到五个部分
+    userMessage += `\n\n**【重要格式要求】**\n请严格按照以下五个部分撰写报告，每部分必须使用 "## 【标题】" 作为标题行（标题独占一行），内容紧随其后。不要合并、遗漏或调换顺序，不要添加额外的章节。每部分务必精炼，不要超出字数范围：\n\n## 【学员优点】\n（100-150字，详细描述学员的优点和突出表现）\n\n## 【能力提升】\n（100-150字，详细描述学员的能力进步和成长）\n\n## 【需要提升】\n（80-120字，客观指出学员需要改进的方面）\n\n## 【阶段性建议】\n（100-150字，给出具体可操作的教学建议）\n\n## 【总结】\n（40-60字，用2-3句话总结整体表现）\n\n总字数控制在500-700字。`;
 
     if (!aiSettings?.useCustomAI || !aiSettings.apiKey || !aiSettings.baseUrl) {
       return errorResponse("AI服务未配置，请在系统设置中配置第三方AI参数", 400);
@@ -148,6 +210,10 @@ export async function POST(request: NextRequest) {
           ctrl.close();
         }, 120_000);
         try {
+          // 在 reportData.metadata 中记录实际使用的 promptStageCode
+          if (stageCodeToQuery) {
+            ctrl.enqueue(encoder.encode(`data: ${JSON.stringify({ metadata: { promptStageCode: stageCodeToQuery } })}\n\n`));
+          }
           for await (const chunk of aiResponse.body as AsyncIterable<Buffer>) {
             buffer += decoder.decode(chunk, { stream: true });
             const parts = buffer.split("\n\n");

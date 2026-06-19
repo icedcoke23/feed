@@ -12,7 +12,10 @@ const testSchema = z.object({
   api_key: z.string().min(1),
   base_url: z.string().url("无效的URL"),
   model_id: z.string().min(1),
-  use_custom_ai: z.boolean().optional().default(true),
+  use_custom_ai: z.union([
+    z.boolean(),
+    z.enum(["true", "false"]).transform((v) => v === "true"),
+  ]).optional().default(true),
 });
 
 // 判断是否为掩码格式的密钥
@@ -49,7 +52,13 @@ export async function POST(request: NextRequest) {
 
     // 校验输入
     const result = validateInput(testSchema, body);
-    if ("error" in result) return result.error;
+    if ("error" in result) {
+      const errorBody = await result.error.clone().json();
+      return successResponse({
+        success: false,
+        message: `请求参数错误: ${errorBody?.error || "输入数据格式错误"}`,
+      });
+    }
     const { api_key, base_url, model_id, use_custom_ai } = result.data;
 
     // 从数据库获取完整密钥（GET接口返回的是掩码版本）
