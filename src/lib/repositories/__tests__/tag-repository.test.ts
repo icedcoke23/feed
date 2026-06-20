@@ -10,7 +10,6 @@ describe("tag-repository", () => {
   beforeEach(async () => {
     testDb = await createTestDb();
     db = testDb.drizzleDb;
-    await db.delete(tags);
   });
 
   afterEach(async () => {

@@ -10,7 +10,6 @@ describe("user-repository", () => {
   beforeEach(async () => {
     testDb = await createTestDb();
     db = testDb.drizzleDb;
-    await db.delete(users);
   });
 
   afterEach(async () => {
