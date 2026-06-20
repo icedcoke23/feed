@@ -1,0 +1,12 @@
+export const HOME_DATA_KEY = "/api/home-data";
+export const STUDENTS_KEY = "/api/students";
+export const CLASSES_KEY = "/api/classes";
+export const TEACHERS_KEY = "/api/teachers";
+export const ADMIN_TEACHERS_KEY = "/api/teachers?role=admin";
+export const COURSE_STAGES_KEY = "/api/course-stages";
+export const TAGS_KEY = "/api/tags";
+export const THEMES_KEY = "/api/themes";
+export const AI_SETTINGS_KEY = "/api/ai-settings";
+export const USERS_KEY = "/api/users";
+export const FEEDBACK_KEY = (id: string) => `/api/feedbacks/${id}`;
+export const STUDENT_KEY = (id: string) => `/api/students/${id}`;

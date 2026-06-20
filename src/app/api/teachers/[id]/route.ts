@@ -1,123 +1,61 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
-import { validateInput } from "@/lib/validations";
-import { insertTeacherSchema } from "@/storage/database/shared/schema";
-import { handleDbError, forbiddenError } from "@/lib/api-error";
-import { getAuthUser } from "@/lib/route-auth";
-import { successResponse, errorResponse } from "@/lib/api-response";
+import { z } from "zod";
+import { withDbError } from "@/lib/route-handlers/with-db-error";
+import { withAuth } from "@/lib/route-handlers/with-auth";
+import { withValidation } from "@/lib/route-handlers/with-validation";
+import { successResponse } from "@/lib/api-response";
+import { teacherService } from "@/lib/services";
 
-// GET /api/teachers/[id]
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const authUser = await getAuthUser(request);
-  if (!authUser) {
-    return errorResponse("未授权访问", 401);
-  }
+const paramsSchema = z.object({ id: z.string().uuid() });
+const bodySchema = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  role: z.enum(["teacher", "admin"]).optional(),
+  isActive: z.boolean().optional(),
+});
 
-  const client = getServerSupabaseClient();
-  const { id } = await params;
+export const GET = withDbError(
+  withAuth(
+    withValidation(
+      { params: paramsSchema },
+      async (req, { authUser, params }) => {
+        const { id } = params as { id: string };
+        const result = await teacherService.findById(authUser!, id);
+        if (result instanceof Response) return result;
+        return successResponse(result);
+      }
+    )
+  )
+);
 
-  try {
-    const { data, error } = await client
-      .from("teachers")
-      .select("*")
-      .eq("id", id)
-      .single();
+export const PUT = withDbError(
+  withAuth(
+    withValidation(
+      { params: paramsSchema, body: bodySchema },
+      async (req, { authUser, params, body }) => {
+        const { id } = params as { id: string };
+        const result = await teacherService.update(
+          authUser!,
+          id,
+          body as Parameters<typeof teacherService.update>[2]
+        );
+        if (result instanceof Response) return result;
+        return successResponse(result, "更新成功");
+      }
+    )
+  )
+);
 
-    if (error) {
-      return handleDbError(error, "获取教师");
-    }
-
-    return successResponse(data);
-  } catch (error) {
-    return handleDbError(error, "获取教师");
-  }
-}
-
-// PUT /api/teachers/[id] - 更新教师（同时同步到 users 表）
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const authUser = await getAuthUser(request);
-  if (!authUser) {
-    return errorResponse("未授权访问", 401);
-  }
-
-  const client = getServerSupabaseClient();
-  const { id } = await params;
-  const body = await request.json();
-
-  const result = validateInput(insertTeacherSchema.partial(), body);
-  if ("error" in result) return result.error;
-  const validatedData = result.data;
-
-  try {
-    const { data, error } = await client
-      .from("teachers")
-      .update({
-        name: validatedData.name,
-        email: validatedData.email,
-        phone: validatedData.phone,
-        role: validatedData.role,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      return handleDbError(error, "更新教师");
-    }
-
-    // 同步更新 users 表
-    const { error: userError } = await client
-      .from("users")
-      .update({
-        name: data.name,
-        phone: data.phone,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (userError) {
-      console.error("Sync update to users table error:", userError);
-    }
-
-    return successResponse(data);
-  } catch (error) {
-    return handleDbError(error, "更新教师");
-  }
-}
-
-// DELETE /api/teachers/[id] - 删除教师（使用 RPC 原子操作）
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const authUser = await getAuthUser(request);
-  if (!authUser) {
-    return errorResponse("未授权访问", 401);
-  }
-
-  if (authUser.userRole !== "admin") {
-    return forbiddenError("仅管理员可访问");
-  }
-
-  const client = getServerSupabaseClient();
-  const { id } = await params;
-
-  try {
-    const { error } = await client.rpc("delete_teacher", { p_teacher_id: id });
-
-    if (error) {
-      return handleDbError(error, "删除教师");
-    }
-
-    return successResponse(null, "删除成功");
-  } catch (error) {
-    return handleDbError(error, "删除教师");
-  }
-}
+export const DELETE = withDbError(
+  withAuth(
+    withValidation(
+      { params: paramsSchema },
+      async (req, { authUser, params }) => {
+        const { id } = params as { id: string };
+        const result = await teacherService.remove(authUser!, id);
+        if (result instanceof Response) return result;
+        return successResponse(null, "删除成功");
+      }
+    )
+  )
+);

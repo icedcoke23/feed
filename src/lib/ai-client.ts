@@ -1,6 +1,7 @@
 import { db } from "@/storage/database/drizzle-client";
 import { aiSettings } from "@/storage/database/shared/schema";
 import { DEFAULT_COZE_MODEL, getDefaultPrompt } from "@/lib/constants/ai";
+import { sanitizeErrorMessage } from "@/lib/sensitive-mask";
 
 // AI 设置类型
 export interface AISettings {
@@ -176,9 +177,7 @@ export async function streamThirdPartyAI(
     console.error("Third-party AI error:", error);
     // 脱敏：移除错误消息中可能包含的 URL 和 API key
     const rawMessage = error instanceof Error ? error.message : "未知错误";
-    const sanitizedMessage = rawMessage
-      .replace(/https?:\/\/[^\s]+/gi, "[URL已隐藏]")
-      .replace(/sk-[a-zA-Z0-9]{8,}/g, "[KEY已隐藏]");
+    const sanitizedMessage = sanitizeErrorMessage(rawMessage);
     return new Response(
       JSON.stringify({ error: `AI调用失败: ${sanitizedMessage}` }),
       {

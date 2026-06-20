@@ -466,6 +466,24 @@ export const insertTeachingThemeSchema = createCoercedInsertSchema(teachingTheme
   sortOrder: true,
 });
 
+export const insertCourseStageSchema = createCoercedInsertSchema(courseStages).pick({
+  stageCode: true,
+  stageName: true,
+  theme: true,
+  level: true,
+  description: true,
+  content: true,
+  goal: true,
+  sortOrder: true,
+});
+
+export const insertCoursePromptSchema = createCoercedInsertSchema(coursePrompts).pick({
+  stageCode: true,
+  systemPrompt: true,
+  reportStructure: true,
+  wordLimit: true,
+});
+
 // TypeScript types
 export type Teacher = typeof teachers.$inferSelect;
 export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
@@ -505,6 +523,10 @@ export type AiSetting = typeof aiSettings.$inferSelect;
 export type InsertAiSetting = z.infer<typeof insertAiSettingSchema>;
 
 export type CoursePrompt = typeof coursePrompts.$inferSelect;
+export type InsertCoursePrompt = z.infer<typeof insertCoursePromptSchema>;
+
+export type CourseStage = typeof courseStages.$inferSelect;
+export type InsertCourseStage = z.infer<typeof insertCourseStageSchema>;
 
 export type StudentClass = typeof studentClasses.$inferSelect;
 export type FeedbackItem = typeof feedbackItems.$inferSelect;
