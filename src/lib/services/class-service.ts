@@ -4,6 +4,7 @@ import { inArray } from "drizzle-orm";
 import * as repo from "@/lib/repositories/class-repository";
 import { buildPaginationMeta } from "@/lib/pagination";
 import { forbiddenError, notFoundError } from "@/lib/api-error";
+import { maskPhone } from "@/lib/sensitive-mask";
 import type { AuthUserResult } from "@/lib/route-auth";
 
 function isAdmin(user: AuthUserResult) {
@@ -21,7 +22,9 @@ async function attachTeachers<T extends { teacherId: string | null }>(
     .select({ id: teachers.id, name: teachers.name, phone: teachers.phone })
     .from(teachers)
     .where(inArray(teachers.id, teacherIds));
-  const teacherMap = new Map(teacherRows.map((t) => [t.id, t]));
+  const teacherMap = new Map(
+    teacherRows.map((t) => [t.id, { id: t.id, name: t.name, phone: maskPhone(t.phone) }])
+  );
   return rows.map((r) => ({ ...r, teacher: r.teacherId ? teacherMap.get(r.teacherId) ?? null : null }));
 }
 

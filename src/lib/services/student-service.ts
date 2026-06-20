@@ -17,6 +17,7 @@ import {
   badRequestError,
 } from "@/lib/api-error";
 import { extractLegacyMetadata } from "@/utils/ai-report";
+import { maskPhone } from "@/lib/sensitive-mask";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { Student, InsertStudent } from "@/storage/database/shared/schema";
 
@@ -45,7 +46,7 @@ function toSnakeCaseStudent(student: Student) {
     name: student.name,
     grade: student.grade,
     school: student.school,
-    phone: student.phone,
+    phone: maskPhone(student.phone),
     current_class: student.currentClass,
     class_id: student.classId,
     current_teacher_id: student.currentTeacherId,
@@ -98,7 +99,9 @@ async function enrichStudents(
       : Promise.resolve([]),
   ]);
 
-  const adminTeacherMap = new Map(adminTeacherRows.map((t) => [t.id, t]));
+  const adminTeacherMap = new Map(
+    adminTeacherRows.map((t) => [t.id, { id: t.id, name: t.name, phone: maskPhone(t.phone) }])
+  );
   const currentClassMap = new Map(currentClassRows.map((c) => [c.id, c]));
 
   const currentClassTeacherIds = [
@@ -112,7 +115,7 @@ async function enrichStudents(
           .where(inArray(teachers.id, currentClassTeacherIds))
       : [];
   const currentClassTeacherMap = new Map(
-    currentClassTeachers.map((t) => [t.id, t])
+    currentClassTeachers.map((t) => [t.id, { id: t.id, name: t.name, phone: maskPhone(t.phone) }])
   );
 
   const scRows = await db
@@ -148,7 +151,9 @@ async function enrichStudents(
           .from(teachers)
           .where(inArray(teachers.id, scTeacherIds))
       : [];
-  const scTeacherMap = new Map(scTeachers.map((t) => [t.id, t]));
+  const scTeacherMap = new Map(
+    scTeachers.map((t) => [t.id, { id: t.id, name: t.name, phone: maskPhone(t.phone) }])
+  );
 
   const scByStudent = new Map<string, typeof scRows>();
   for (const sc of scRows) {

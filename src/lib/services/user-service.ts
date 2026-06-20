@@ -9,6 +9,7 @@ import {
   notFoundError,
   badRequestError,
 } from "@/lib/api-error";
+import { maskPhone } from "@/lib/sensitive-mask";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { User } from "@/storage/database/shared/schema";
 
@@ -22,7 +23,7 @@ function toSnakeCaseUser(user: User & { teacherRole?: "admin" | "teacher" }) {
     username: user.username,
     name: user.name,
     role: user.role,
-    phone: user.phone,
+    phone: maskPhone(user.phone),
     is_active: user.isActive,
     created_at: user.createdAt,
     teacherRole: user.teacherRole,

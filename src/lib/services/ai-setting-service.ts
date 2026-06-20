@@ -2,16 +2,12 @@ import * as repo from "@/lib/repositories/ai-setting-repository";
 import { forbiddenError } from "@/lib/api-error";
 import { DEFAULT_COZE_MODEL, getDefaultPrompt } from "@/lib/constants/ai";
 import { isMaskedKey } from "@/lib/ai-client";
+import { maskApiKey, maskUrl } from "@/lib/sensitive-mask";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { AiSetting, InsertAiSetting } from "@/storage/database/shared/schema";
 
 function isAdmin(user: AuthUserResult) {
   return user.userRole === "admin";
-}
-
-function maskApiKey(key: string): string {
-  if (!key || key.length <= 8) return "****";
-  return key.slice(0, 4) + "****" + key.slice(-4);
 }
 
 export interface AISettingsResponse {
@@ -36,8 +32,8 @@ function toResponse(settings: AiSetting | null): AISettingsResponse {
   }
 
   return {
-    api_key: settings.apiKey ? maskApiKey(settings.apiKey) : "",
-    base_url: settings.baseUrl || "",
+    api_key: settings.apiKey ? maskApiKey(settings.apiKey) ?? "" : "",
+    base_url: maskUrl(settings.baseUrl) ?? "",
     model_id: settings.modelId || DEFAULT_COZE_MODEL,
     max_concurrent: String(settings.maxConcurrent ?? 5),
     system_prompt: settings.systemPrompt || getDefaultPrompt(),
