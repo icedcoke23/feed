@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createTestDb } from "./db";
 
 describe("test infrastructure smoke tests", () => {
-  it("createTestDb returns a drizzle db", () => {
-    const { drizzleDb } = createTestDb();
+  it("createTestDb returns a drizzle db", async () => {
+    const { drizzleDb } = await createTestDb();
     expect(drizzleDb).toBeDefined();
   });
 

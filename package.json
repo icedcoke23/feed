@@ -82,6 +82,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.2.17",
     "@react-dev-inspector/babel-plugin": "^2.0.1",
     "@react-dev-inspector/middleware": "^2.0.1",
     "@tailwindcss/postcss": "^4",
@@ -101,6 +102,8 @@
     "jsdom": "^29.1.1",
     "only-allow": "^1.2.2",
     "pg-mem": "^3.0.14",
+    "pg-server": "^0.1.8",
+    "postgres": "^3.3.5",
     "react-dev-inspector": "^2.0.1",
     "shadcn": "latest",
     "tailwindcss": "^4",

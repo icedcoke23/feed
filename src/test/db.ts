@@ -1,20 +1,38 @@
-import { newDb, DataType } from "pg-mem";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
 import * as schema from "@/storage/database/shared/schema";
+import { readFileSync } from "fs";
+import { join } from "path";
 
-export function createTestDb() {
-  const db = newDb();
+async function runMigrations(client: PGlite) {
+  const sql = readFileSync(
+    join(
+      process.cwd(),
+      "src",
+      "storage",
+      "database",
+      "migrations",
+      "0000_equal_harpoon.sql"
+    ),
+    "utf-8"
+  );
 
-  db.public.registerFunction({
-    name: "gen_random_uuid",
-    returns: DataType.uuid,
-    implementation: () => crypto.randomUUID(),
-    impure: true,
-  });
+  const statements = sql
+    .split("--> statement-breakpoint")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  const pg = db.adapters.createPg();
-  const pool = new pg.Pool();
-  const drizzleDb = drizzle(pool, { schema });
+  for (const statement of statements) {
+    await client.exec(statement);
+  }
+}
 
-  return { db, pool, drizzleDb };
+export async function createTestDb() {
+  const client = new PGlite();
+
+  await runMigrations(client);
+
+  const drizzleDb = drizzle(client, { schema });
+
+  return { client, drizzleDb };
 }
