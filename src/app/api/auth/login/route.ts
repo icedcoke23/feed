@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { db } from "@/storage/database/drizzle-client";
+import { users, teachers } from "@/storage/database/shared/schema";
+import { eq, and } from "drizzle-orm";
 import {
   signToken,
   comparePassword,
@@ -11,8 +13,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "请输入用户名"),
-  password: z.string().min(1, "请输入密码"),
+  username: z.string({ required_error: "请求参数错误" }).min(1, "请求参数错误"),
+  password: z.string({ required_error: "请求参数错误" }).min(1, "请求参数错误"),
 });
 
 // POST /api/auth/login - 用户登录
@@ -25,90 +27,88 @@ export async function POST(request: NextRequest) {
   const { allowed, retryAfterMs } = checkRateLimit(`login:${ip}`, 5, 60_000);
   if (!allowed) {
     return NextResponse.json(
-      { error: "请求过于频繁，请稍后再试", retryAfter: retryAfterMs / 1000 },
+      { error: "请求过于频繁，请稍后再试", code: "RATE_LIMITED", retryAfter: retryAfterMs / 1000 },
       { status: 429 }
     );
   }
 
-  const client = getServerSupabaseClient();
   const body = await request.json();
 
   // 校验输入
+  if (!body || typeof body !== "object" || !("username" in body) || !("password" in body)) {
+    return NextResponse.json(
+      { error: "请求参数错误", code: "VALIDATION_ERROR" },
+      { status: 400 }
+    );
+  }
   const result = validateInput(loginSchema, body);
   if ("error" in result) return result.error;
   const { username, password } = result.data;
 
   try {
     // 通过 username 查找用户（不再用密码匹配查询）
-    const { data, error } = await client
-      .from("users")
-      .select("id, username, name, role, phone, password, is_active")
-      .eq("username", username)
-      .single();
+    const rows = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.username, username), eq(users.isActive, true)))
+      .limit(1);
+    const user = rows[0];
 
-    if (error || !data) {
+    if (!user) {
       return NextResponse.json(
-        { error: "用户名或密码错误" },
-        { status: 401 }
-      );
-    }
-
-    // 检查用户是否被禁用（兼容 is_active 为 null 的情况，null 视为启用）
-    if (data.is_active === false) {
-      return NextResponse.json(
-        { error: "账户已被禁用" },
+        { error: "用户名或密码错误", code: "INVALID_CREDENTIALS" },
         { status: 401 }
       );
     }
 
     // 密码不是 bcrypt 哈希格式，拒绝登录
-    if (!isBcryptHash(data.password)) {
+    if (!isBcryptHash(user.password)) {
       return NextResponse.json(
-        { error: "密码格式已过期，请联系管理员重置密码" },
+        { error: "密码格式已过期，请联系管理员重置密码", code: "PASSWORD_FORMAT_EXPIRED" },
         { status: 401 }
       );
     }
 
     // 验证密码
-    const isPasswordValid = await comparePassword(password, data.password);
+    const isPasswordValid = await comparePassword(password, user.password);
 
     if (!isPasswordValid) {
       return NextResponse.json(
-        { error: "用户名或密码错误" },
+        { error: "用户名或密码错误", code: "INVALID_CREDENTIALS" },
         { status: 401 }
       );
     }
 
     // 签发 JWT Token
     const token = await signToken({
-      userId: data.id,
-      role: data.role,
+      userId: user.id,
+      role: user.role as "admin" | "teacher",
     });
 
     // 构造不含密码的用户信息
     const userInfo: Record<string, unknown> = {
-      id: data.id,
-      username: data.username,
-      name: data.name,
-      role: data.role,
-      phone: data.phone,
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      phone: user.phone,
     };
 
     // 如果是 teacher 角色，关联查询 teachers 表获取 role
-    if (data.role === "teacher") {
-      const { data: teacherData } = await client
-        .from("teachers")
-        .select("role")
-        .eq("id", data.id)
-        .single();
-      if (teacherData) {
-        userInfo.teacherRole = teacherData.role;
+    if (user.role === "teacher") {
+      const teacherRows = await db
+        .select({ role: teachers.role })
+        .from(teachers)
+        .where(eq(teachers.id, user.id))
+        .limit(1);
+      if (teacherRows[0]) {
+        userInfo.teacherRole = teacherRows[0].role;
       }
     }
 
     // 将 Token 设置到 httpOnly Cookie 中
     const response = NextResponse.json({
-      user: userInfo,
+      data: userInfo,
       message: "登录成功",
     });
 

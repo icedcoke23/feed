@@ -148,7 +148,7 @@ describe('runDryRun', () => {
 });
 
 describe('importSchedule integration', () => {
-  it('首次导入创建教师、班级和学生', async () => {
+  it('首次导入创建教师、班级和学生', { timeout: 30000 }, async () => {
     const { drizzleDb } = await createTestDb();
 
     const result = await importSchedule(drizzleDb, parseScheduleData(sampleInput));

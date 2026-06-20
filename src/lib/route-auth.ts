@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, signToken, COOKIE_NAME } from "@/lib/auth";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { db } from "@/storage/database/drizzle-client";
+import { teachers, classes, studentClasses } from "@/storage/database/shared/schema";
+import { eq, and, or, isNull, inArray } from "drizzle-orm";
 import { jwtVerify } from "jose";
 
 export interface AuthUserResult {
@@ -39,13 +41,12 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUserResult 
   // 如果是 teacher 角色，查询 teachers 表获取 role
   let teacherRole: "admin" | "teacher" | undefined;
   if (payload.role === "teacher") {
-    const client = getServerSupabaseClient();
-    const { data: teacherData } = await client
-      .from("teachers")
-      .select("role")
-      .eq("id", payload.userId)
-      .single();
-    teacherRole = (teacherData?.role as "admin" | "teacher") || "teacher";
+    const teacherRows = await db
+      .select({ role: teachers.role })
+      .from(teachers)
+      .where(eq(teachers.id, payload.userId))
+      .limit(1);
+    teacherRole = (teacherRows[0]?.role as "admin" | "teacher") || "teacher";
   }
 
   return { userId: payload.userId, userRole: payload.role, teacherRole, newToken };
@@ -77,15 +78,17 @@ export function attachRenewedToken(
  * 获取教师所负责的所有班级 ID
  */
 export async function getTeacherClassIds(userId: string): Promise<string[]> {
-  const client = getServerSupabaseClient();
-  const { data, error } = await client
-    .from("classes")
-    .select("id")
-    .eq("teacher_id", userId)
-    .or("is_active.eq.true,is_active.is.null");
+  const rows = await db
+    .select({ id: classes.id })
+    .from(classes)
+    .where(
+      and(
+        eq(classes.teacherId, userId),
+        or(eq(classes.isActive, true), isNull(classes.isActive))
+      )
+    );
 
-  if (error || !data) return [];
-  return data.map((c: { id: string }) => c.id);
+  return rows.map((c) => c.id);
 }
 
 /**
@@ -95,13 +98,10 @@ export async function canTeacherAccessStudent(userId: string, studentId: string)
   const classIds = await getTeacherClassIds(userId);
   if (classIds.length === 0) return false;
 
-  const client = getServerSupabaseClient();
-  const { data, error } = await client
-    .from("student_classes")
-    .select("class_id")
-    .eq("student_id", studentId)
-    .in("class_id", classIds);
+  const rows = await db
+    .select({ classId: studentClasses.classId })
+    .from(studentClasses)
+    .where(and(eq(studentClasses.studentId, studentId), inArray(studentClasses.classId, classIds)));
 
-  if (error || !data) return false;
-  return data.length > 0;
+  return rows.length > 0;
 }

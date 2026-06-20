@@ -13,7 +13,7 @@ export function validateInput<T>(schema: ZodSchema<T>, data: unknown): { data: T
     const issues = zodError.issues || zodError.errors;
     if (issues && Array.isArray(issues) && issues.length > 0) {
       const message = issues[0].message || "输入数据格式错误";
-      return { error: errorResponse(message, 400) };
+      return { error: errorResponse(message, 400, "VALIDATION_ERROR") };
     }
     // 其他错误
     const message = error instanceof Error ? error.message : "输入数据格式错误";
