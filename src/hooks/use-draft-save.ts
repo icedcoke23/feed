@@ -28,9 +28,9 @@ export function useDraftSave(draftData: DraftData | null) {
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(DRAFT_KEY);
-      setHasDraft(!!saved);
+      setTimeout(() => setHasDraft(!!saved), 0);
     } catch {
-      setHasDraft(false);
+      setTimeout(() => setHasDraft(false), 0);
     }
   }, []);
 

@@ -6,7 +6,7 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { withLogging } from "@/lib/api-logger";
 
 // 内存缓存：基于用户 ID 的缓存 key
-const statsCacheMap = new Map<string, { data: any; timestamp: number }>();
+const statsCacheMap = new Map<string, { data: unknown; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 分钟
 
 // GET /api/stats - 获取统计数据

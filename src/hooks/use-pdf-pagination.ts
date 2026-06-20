@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import type { CoursePlan, ReportData } from "@/types/feedback";
 import type {
   AnalysisPageData,
@@ -210,42 +210,34 @@ export interface UsePdfPaginationReturn {
 }
 
 export function usePdfPagination(reportData: ReportData | null): UsePdfPaginationReturn {
-  const [analysisPages, setAnalysisPages] = useState<AnalysisPageData[]>([]);
-  const [coursePlanPages, setCoursePlanPages] = useState<CoursePlanPageData[]>([]);
-  const [recommendationPages, setRecommendationPages] = useState<RecommendationPageData[]>([]);
-
-  useEffect(() => {
-    if (!reportData) return;
+  return useMemo(() => {
+    if (!reportData) {
+      return { analysisPages: [], coursePlanPages: [], recommendationPages: [] };
+    }
 
     // 学情分析分页
-    const analysis = calculateAnalysisPages(
+    const analysisPages = calculateAnalysisPages(
       reportData.strengths || "",
       reportData.improvements || "",
       reportData.weaknesses || ""
     );
-    setAnalysisPages(analysis);
 
     // 课程规划分页
-    if (reportData.hasCoursePlan && reportData.coursePlans && reportData.coursePlans.length > 0) {
-      const coursePlan = calculateCoursePlanPages(reportData.coursePlans);
-      setCoursePlanPages(coursePlan);
-    } else {
-      setCoursePlanPages([]);
-    }
+    const coursePlanPages =
+      reportData.hasCoursePlan && reportData.coursePlans && reportData.coursePlans.length > 0
+        ? calculateCoursePlanPages(reportData.coursePlans)
+        : [];
 
     // 教师建议分页（传入总结和照片数量）
-    if (reportData.recommendations || reportData.summary) {
-      const photoCount = reportData.studentPhotos?.length || 0;
-      const rec = calculateRecommendationPages(
-        reportData.recommendations || "",
-        reportData.summary || "",
-        photoCount
-      );
-      setRecommendationPages(rec);
-    } else {
-      setRecommendationPages([]);
-    }
-  }, [reportData]);
+    const recommendationPages =
+      reportData.recommendations || reportData.summary
+        ? calculateRecommendationPages(
+            reportData.recommendations || "",
+            reportData.summary || "",
+            reportData.studentPhotos?.length || 0
+          )
+        : [];
 
-  return { analysisPages, coursePlanPages, recommendationPages };
+    return { analysisPages, coursePlanPages, recommendationPages };
+  }, [reportData]);
 }

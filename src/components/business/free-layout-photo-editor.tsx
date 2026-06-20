@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Rnd } from "react-rnd";
 import { Crop, Replace, X, RotateCcw } from "lucide-react";
 
@@ -60,6 +60,11 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
 
+  const currentPhotoIds = useMemo(
+    () => photos.slice(0, 6).map(p => p.id).join(","),
+    [photos]
+  );
+
   // 同步 photos prop 中的 URL 变更，并重新计算宽高比
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +86,9 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
           return layout;
         })
       );
-      if (!cancelled) setLayouts(updated);
+      if (!cancelled) {
+        setTimeout(() => setLayouts(updated), 0);
+      }
     };
     updateLayouts();
     return () => { cancelled = true; };
@@ -89,9 +96,9 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
 
   // 初始化布局：读取每张图片的实际宽高比
   useEffect(() => {
-    const currentPhotoIds = photos.slice(0, 6).map(p => p.id).join(",");
     if (currentPhotoIds === prevPhotoIds) return;
-    setPrevPhotoIds(currentPhotoIds);
+
+    setTimeout(() => setPrevPhotoIds(currentPhotoIds), 0);
 
     // 过滤掉没有有效URL的照片
     const validPhotos = photos.slice(0, 6).filter(p => p.url && p.url.trim());
@@ -99,15 +106,17 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
     const count = validPhotos.length;
 
     // 清理已不存在照片的失败记录
-    setFailedImageIds(prev => {
-      const next = new Set(prev);
-      next.forEach(id => {
-        if (!validPhotos.find(p => p.id === id)) next.delete(id);
+    setTimeout(() => {
+      setFailedImageIds(prev => {
+        const next = new Set(prev);
+        next.forEach(id => {
+          if (!validPhotos.find(p => p.id === id)) next.delete(id);
+        });
+        return next;
       });
-      return next;
-    });
+    }, 0);
 
-    if (count === 0) { console.warn('[PhotoEditor] no valid photos'); setLayouts([]); return; }
+    if (count === 0) { console.warn('[PhotoEditor] no valid photos'); setTimeout(() => setLayouts([]), 0); return; }
 
     const initLayouts = async () => {
       const cols = count <= 2 ? count : 3;
@@ -135,18 +144,19 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
           aspectRatio: isFinite(ratio) && ratio > 0 ? ratio : 4 / 3,
         };
       });
-      setLayouts(newLayouts);
-      const newZ: Record<string, number> = {};
-      newLayouts.forEach((l, i) => { newZ[l.id] = i + 1; });
-      setZIndices(newZ);
-      nextZRef.current = newLayouts.length + 1;
+      setTimeout(() => {
+        setLayouts(newLayouts);
+        const newZ: Record<string, number> = {};
+        newLayouts.forEach((l, i) => { newZ[l.id] = i + 1; });
+        setZIndices(newZ);
+        nextZRef.current = newLayouts.length + 1;
+      }, 0);
     };
     initLayouts();
-  }, [photos.map(p => p.id).join(","), prevPhotoIds]);
+  }, [currentPhotoIds, prevPhotoIds]);
 
   // 重试机制：首次计算时容器宽度可能为 0，延迟重新计算
   useEffect(() => {
-    const currentPhotoIds = photos.slice(0, 6).map(p => p.id).join(",");
     if (!currentPhotoIds) return;
 
     const timer = setTimeout(() => {
@@ -160,7 +170,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
       }
     }, 200);
     return () => clearTimeout(timer);
-  }, [layouts, photos]);
+  }, [currentPhotoIds, layouts, photos]);
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
     setLayouts(prev => prev.map(l => l.id === id ? { ...l, x: d.x, y: d.y } : l));
@@ -190,7 +200,6 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
   };
 
   if (photos.length === 0) return null;
-  console.log('[PhotoEditor] rendering, layouts count:', layouts.length, 'containerWidth:', containerRef.current?.offsetWidth);
 
   return (
     <div

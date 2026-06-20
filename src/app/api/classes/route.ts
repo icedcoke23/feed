@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       .filter(Boolean);
 
     // 如果有教师ID，从teachers表获取教师信息
-    let teachersMap: Record<string, { id: string; name: string; phone?: string }> = {};
+    const teachersMap: Record<string, { id: string; name: string; phone?: string }> = {};
     if (teacherIds.length > 0) {
       const { data: teachersData, error: teachersError } = await client
         .from("teachers")

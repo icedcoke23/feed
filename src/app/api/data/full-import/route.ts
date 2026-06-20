@@ -514,7 +514,7 @@ export async function POST(request: NextRequest) {
 
     let missingClassCount = 0;
     let teacherFallbackCount = 0;
-    let adminTeacherAssigned = { xinxin: 0, yanzi: 0 };
+    const adminTeacherAssigned = { xinxin: 0, yanzi: 0 };
     
     for (const student of students) {
       const studentData = student as Record<string, unknown>;

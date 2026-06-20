@@ -13,6 +13,12 @@ const eslintConfig = defineConfig([
     'build/**',
     'next-env.d.ts',
   ]),
+  {
+    files: ['scripts/**/*.js', '.trae/skills/**/*.{js,cjs}'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 ]);
 
 export default eslintConfig;

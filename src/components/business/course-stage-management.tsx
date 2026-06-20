@@ -152,7 +152,7 @@ export function CourseStageManagement({
           <CardContent className="p-8 text-center">
             <GraduationCap className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">暂无课程阶段预设</p>
-            <p className="text-sm text-gray-400 mt-2">点击"添加默认预设"快速添加Scratch/Python/C++的预设，或手动添加</p>
+            <p className="text-sm text-gray-400 mt-2">点击“添加默认预设”快速添加Scratch/Python/C++的预设，或手动添加</p>
           </CardContent>
         </Card>
       ) : (
