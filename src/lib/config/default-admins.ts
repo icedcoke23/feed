@@ -34,3 +34,22 @@ function generatePlaceholderPassword(): string {
   crypto.getRandomValues(array);
   return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+/**
+ * 读取环境变量 `ADMIN_TEACHER_MAPPINGS` 中的教务老师类型映射。
+ * 用于批量导入时将 `adminType` 映射到教务老师用户名。
+ * 格式：`type1:username1,type2:username2`
+ * 例如：`心:心心,高:燕子`
+ */
+export function getAdminTeacherMappings(): Record<string, string> {
+  const raw = process.env.ADMIN_TEACHER_MAPPINGS || "";
+  if (!raw.trim()) return {};
+
+  return raw.split(",").reduce<Record<string, string>>((acc, part) => {
+    const [type, username] = part.trim().split(":");
+    if (type && username) {
+      acc[type.trim()] = username.trim();
+    }
+    return acc;
+  }, {});
+}
