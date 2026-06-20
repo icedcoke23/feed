@@ -3,9 +3,10 @@ import {
   classes,
   students,
   teachers,
+  users,
   studentClasses,
 } from "@/storage/database/shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export interface ClassData {
   teacherName: string;
@@ -180,4 +181,61 @@ export async function importClasses(classDataList: ClassData[]): Promise<BatchIm
 
     return result;
   });
+}
+
+export interface UpdateAdminTeacherInput {
+  name: string;
+  adminType: string;
+}
+
+export interface UpdateAdminTeachersResult {
+  updated: number;
+  notFound: string[];
+  errors: string[];
+}
+
+export async function updateAdminTeachers(
+  items: UpdateAdminTeacherInput[],
+  mappings: Record<string, string>
+): Promise<UpdateAdminTeachersResult> {
+  const result: UpdateAdminTeachersResult = {
+    updated: 0,
+    notFound: [],
+    errors: [],
+  };
+
+  const usernames = [...new Set(Object.values(mappings))];
+  const teacherRows = await db
+    .select({ id: users.id, username: users.username })
+    .from(users)
+    .where(inArray(users.username, usernames));
+
+  const teacherIdByUsername = new Map(teacherRows.map((t) => [t.username, t.id]));
+  const teacherIdByType = new Map<string, string | null>();
+  for (const [type, username] of Object.entries(mappings)) {
+    teacherIdByType.set(type, teacherIdByUsername.get(username) || null);
+  }
+
+  for (const item of items) {
+    const adminTeacherId = teacherIdByType.get(item.adminType);
+
+    if (!adminTeacherId) {
+      result.errors.push(`未找到教务老师: ${item.adminType}`);
+      continue;
+    }
+
+    const updatedRows = await db
+      .update(students)
+      .set({ adminTeacherId })
+      .where(eq(students.name, item.name))
+      .returning({ id: students.id });
+
+    if (updatedRows.length === 0) {
+      result.notFound.push(item.name);
+    } else {
+      result.updated += updatedRows.length;
+    }
+  }
+
+  return result;
 }

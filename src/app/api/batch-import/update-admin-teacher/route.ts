@@ -1,11 +1,9 @@
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
 import { withDbError } from "@/lib/route-handlers/with-db-error";
 import { withAuth } from "@/lib/route-handlers/with-auth";
 import { withValidation } from "@/lib/route-handlers/with-validation";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { db } from "@/storage/database/drizzle-client";
-import { students, users } from "@/storage/database/shared/schema";
+import { batchImportService } from "@/lib/services";
 import { getAdminTeacherMappings } from "@/lib/config/default-admins";
 
 const updateAdminTeacherSchema = z.object({
@@ -31,48 +29,10 @@ export const POST = withDbError(
           return errorResponse("未配置 ADMIN_TEACHER_MAPPINGS 环境变量", 400);
         }
 
-        const input = body as { students: Array<{ name: string; adminType: string }> };
+        const input = body as { students: batchImportService.UpdateAdminTeacherInput[] };
+        const result = await batchImportService.updateAdminTeachers(input.students, mappings);
 
-        const usernames = [...new Set(Object.values(mappings))];
-        const teacherRows = await db
-          .select({ id: users.id, username: users.username })
-          .from(users)
-          .where(inArray(users.username, usernames));
-
-        const teacherIdByUsername = new Map(teacherRows.map((t) => [t.username, t.id]));
-        const teacherIdByType = new Map<string, string | null>();
-        for (const [type, username] of Object.entries(mappings)) {
-          teacherIdByType.set(type, teacherIdByUsername.get(username) || null);
-        }
-
-        const results = {
-          updated: 0,
-          notFound: [] as string[],
-          errors: [] as string[],
-        };
-
-        for (const student of input.students) {
-          const adminTeacherId = teacherIdByType.get(student.adminType);
-
-          if (!adminTeacherId) {
-            results.errors.push(`未找到教务老师: ${student.adminType}`);
-            continue;
-          }
-
-          const updatedRows = await db
-            .update(students)
-            .set({ adminTeacherId })
-            .where(eq(students.name, student.name))
-            .returning({ id: students.id });
-
-          if (updatedRows.length === 0) {
-            results.notFound.push(student.name);
-          } else {
-            results.updated += updatedRows.length;
-          }
-        }
-
-        return successResponse(results, `成功更新 ${results.updated} 条记录`);
+        return successResponse(result, `成功更新 ${result.updated} 条记录`);
       }
     )
   )
