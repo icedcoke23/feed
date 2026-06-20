@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   pgTable,
   text,
@@ -6,6 +7,7 @@ import {
   timestamp,
   boolean,
   integer,
+  smallint,
   jsonb,
   index,
   uniqueIndex,
@@ -51,10 +53,18 @@ export const students = pgTable(
     grade: varchar("grade", { length: 50 }),
     school: varchar("school", { length: 255 }),
     phone: varchar("phone", { length: 20 }),
-    currentTeacherId: varchar("current_teacher_id", { length: 36 }),
+    currentTeacherId: varchar("current_teacher_id", { length: 36 }).references(
+      () => teachers.id,
+      { onDelete: "set null" }
+    ),
     currentClass: varchar("current_class", { length: 100 }),
-    classId: varchar("class_id", { length: 36 }),
-    adminTeacherId: varchar("admin_teacher_id", { length: 36 }),
+    classId: varchar("class_id", { length: 36 }).references(() => classes.id, {
+      onDelete: "set null",
+    }),
+    adminTeacherId: varchar("admin_teacher_id", { length: 36 }).references(
+      () => teachers.id,
+      { onDelete: "set null" }
+    ),
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -76,8 +86,12 @@ export const feedbacks = pgTable(
     id: varchar("id", { length: 36 })
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    studentId: varchar("student_id", { length: 36 }).notNull(),
-    teacherId: varchar("teacher_id", { length: 36 }).notNull(),
+    studentId: varchar("student_id", { length: 36 })
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    teacherId: varchar("teacher_id", { length: 36 })
+      .notNull()
+      .references(() => teachers.id, { onDelete: "restrict" }),
     
     // 学情分析
     strengths: jsonb("strengths").default([]), // 优点标签和描述
@@ -103,7 +117,10 @@ export const feedbacks = pgTable(
 
     // 版本管理
     version: integer("version").default(1).notNull(),
-    parentFeedbackId: varchar("parent_feedback_id", { length: 36 }), // 父版本ID
+    parentFeedbackId: varchar("parent_feedback_id", { length: 36 }).references(
+      (): AnyPgColumn => feedbacks.id,
+      { onDelete: "set null" }
+    ), // 父版本ID
     
     // 状态
     status: varchar("status", { length: 20 }).default("draft").notNull(), // draft, published
@@ -122,6 +139,92 @@ export const feedbacks = pgTable(
   ]
 );
 
+// 学生班级关联表
+export const studentClasses = pgTable(
+  "student_classes",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    studentId: varchar("student_id", { length: 36 })
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    classId: varchar("class_id", { length: 36 })
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    joinedAt: timestamp("joined_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    leftAt: timestamp("left_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("student_classes_student_idx").on(table.studentId),
+    index("student_classes_class_idx").on(table.classId),
+    uniqueIndex("student_classes_primary_idx")
+      .on(table.studentId)
+      .where(sql`${table.isPrimary} = true`),
+  ]
+);
+
+// 反馈项目表（拆分 feedbacks.strengths / improvements / weaknesses）
+export const feedbackItems = pgTable(
+  "feedback_items",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    feedbackId: varchar("feedback_id", { length: 36 })
+      .notNull()
+      .references(() => feedbacks.id, { onDelete: "cascade" }),
+    tagId: varchar("tag_id", { length: 36 }).references(() => tags.id, {
+      onDelete: "set null",
+    }),
+    category: varchar("category", { length: 20 }).notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    rating: smallint("rating"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("feedback_items_feedback_id_idx").on(table.feedbackId),
+    index("feedback_items_tag_id_idx").on(table.tagId),
+    index("feedback_items_category_idx").on(table.category),
+  ]
+);
+
+// 能力评分表（拆分 feedbacks.ability_scores）
+export const feedbackAbilityScores = pgTable(
+  "feedback_ability_scores",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    feedbackId: varchar("feedback_id", { length: 36 })
+      .notNull()
+      .references(() => feedbacks.id, { onDelete: "cascade" }),
+    abilityName: varchar("ability_name", { length: 100 }).notNull(),
+    score: smallint("score").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("feedback_ability_scores_feedback_id_idx").on(table.feedbackId),
+    uniqueIndex("feedback_ability_scores_unique_idx").on(
+      table.feedbackId,
+      table.abilityName
+    ),
+  ]
+);
+
 // 转班记录表
 export const classTransfers = pgTable(
   "class_transfers",
@@ -129,9 +232,16 @@ export const classTransfers = pgTable(
     id: varchar("id", { length: 36 })
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    studentId: varchar("student_id", { length: 36 }).notNull(),
-    fromTeacherId: varchar("from_teacher_id", { length: 36 }),
-    toTeacherId: varchar("to_teacher_id", { length: 36 }).notNull(),
+    studentId: varchar("student_id", { length: 36 })
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    fromTeacherId: varchar("from_teacher_id", { length: 36 }).references(
+      () => teachers.id,
+      { onDelete: "set null" }
+    ),
+    toTeacherId: varchar("to_teacher_id", { length: 36 })
+      .notNull()
+      .references(() => teachers.id, { onDelete: "restrict" }),
     fromClass: varchar("from_class", { length: 100 }),
     toClass: varchar("to_class", { length: 100 }),
     reason: text("reason"),
@@ -216,7 +326,10 @@ export const classes = pgTable(
       .default(sql`gen_random_uuid()`),
     name: varchar("name", { length: 100 }).notNull(),
     grade: varchar("grade", { length: 50 }),
-    teacherId: varchar("teacher_id", { length: 36 }),
+    teacherId: varchar("teacher_id", { length: 36 }).references(
+      () => teachers.id,
+      { onDelete: "set null" }
+    ),
     schedule: varchar("schedule", { length: 255 }),
     description: text("description"),
     isActive: boolean("is_active").default(true).notNull(),
@@ -257,12 +370,17 @@ export const aiSettings = pgTable(
     id: varchar("id", { length: 36 })
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    settingKey: varchar("setting_key", { length: 100 }).notNull().unique(),
-    settingValue: text("setting_value"),
-    description: varchar("description", { length: 255 }),
+    apiKey: text("api_key"),
+    baseUrl: text("base_url"),
+    modelId: varchar("model_id", { length: 100 })
+      .notNull()
+      .default("gpt-3.5-turbo"),
+    maxConcurrent: integer("max_concurrent").notNull().default(5),
+    systemPrompt: text("system_prompt"),
+    useCustomAi: boolean("use_custom_ai").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
-  (table) => [index("ai_settings_key_idx").on(table.settingKey)]
+  (table) => [index("ai_settings_updated_idx").on(table.updatedAt)]
 );
 
 // 课程阶段专属 AI 提示词表
@@ -272,7 +390,10 @@ export const coursePrompts = pgTable(
     id: varchar("id", { length: 36 })
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    stageCode: varchar("stage_code", { length: 50 }).notNull().unique(),
+    stageCode: varchar("stage_code", { length: 50 })
+      .notNull()
+      .unique()
+      .references(() => courseStages.stageCode, { onDelete: "cascade" }),
     systemPrompt: text("system_prompt"),
     reportStructure: text("report_structure"),
     wordLimit: varchar("word_limit", { length: 20 }),
@@ -369,9 +490,12 @@ export const insertUserSchema = createCoercedInsertSchema(users).pick({
 });
 
 export const insertAiSettingSchema = createCoercedInsertSchema(aiSettings).pick({
-  settingKey: true,
-  settingValue: true,
-  description: true,
+  apiKey: true,
+  baseUrl: true,
+  modelId: true,
+  maxConcurrent: true,
+  systemPrompt: true,
+  useCustomAi: true,
 });
 
 export type User = typeof users.$inferSelect;
@@ -381,3 +505,7 @@ export type AiSetting = typeof aiSettings.$inferSelect;
 export type InsertAiSetting = z.infer<typeof insertAiSettingSchema>;
 
 export type CoursePrompt = typeof coursePrompts.$inferSelect;
+
+export type StudentClass = typeof studentClasses.$inferSelect;
+export type FeedbackItem = typeof feedbackItems.$inferSelect;
+export type FeedbackAbilityScore = typeof feedbackAbilityScores.$inferSelect;
