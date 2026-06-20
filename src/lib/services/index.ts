@@ -1,0 +1,11 @@
+export * as authService from "./auth-service";
+export * as teacherService from "./teacher-service";
+export * as classService from "./class-service";
+export * as studentService from "./student-service";
+export * as feedbackService from "./feedback-service";
+export * as userService from "./user-service";
+export * as aiSettingService from "./ai-setting-service";
+export * as lookupService from "./lookup-service";
+export * as coursePromptService from "./course-prompt-service";
+export * as dataService from "./data-service";
+export * as homeService from "./home-service";

@@ -1,0 +1,9 @@
+export * as teacherRepository from "./teacher-repository";
+export * as classRepository from "./class-repository";
+export * as studentRepository from "./student-repository";
+export * as feedbackRepository from "./feedback-repository";
+export * as userRepository from "./user-repository";
+export * as aiSettingRepository from "./ai-setting-repository";
+export * as lookupRepository from "./lookup-repository";
+export * as coursePromptRepository from "./course-prompt-repository";
+export * as dataRepository from "./data-repository";
