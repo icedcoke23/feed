@@ -11,6 +11,7 @@ import {
   users,
 } from "@/storage/database/shared/schema";
 import { eq } from "drizzle-orm";
+import * as dataRepo from "@/lib/repositories/data-repository";
 
 export interface ExportData {
   exportTime: string;
@@ -161,4 +162,14 @@ export async function clearAll(): Promise<ClearResult> {
       teachersDeleted: teachersDeleted.length,
     },
   };
+}
+
+export type { ImportData, ImportResults } from "@/lib/repositories/data-repository";
+
+export async function importData(data: dataRepo.ImportData, mode: "overwrite" | "incremental") {
+  return dataRepo.importData(data, { clearFirst: mode === "overwrite" });
+}
+
+export async function fullImport(data: dataRepo.ImportData) {
+  return dataRepo.importData(data, { clearFirst: true, isFullImport: true });
 }
