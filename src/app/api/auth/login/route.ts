@@ -13,8 +13,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const loginSchema = z.object({
-  username: z.string({ required_error: "请求参数错误" }).min(1, "请求参数错误"),
-  password: z.string({ required_error: "请求参数错误" }).min(1, "请求参数错误"),
+  username: z.string().min(1, "请求参数错误"),
+  password: z.string().min(1, "请求参数错误"),
 });
 
 // POST /api/auth/login - 用户登录
