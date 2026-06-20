@@ -10,5 +10,6 @@ export * as coursePromptService from "./course-prompt-service";
 export * as courseStageService from "./course-stage-service";
 export * as tagService from "./tag-service";
 export * as themeService from "./theme-service";
+export * as statsService from "./stats-service";
 export * as dataService from "./data-service";
 export * as homeService from "./home-service";
