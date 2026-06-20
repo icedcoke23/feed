@@ -1,6 +1,6 @@
 import { db } from "@/storage/database/drizzle-client";
 import { coursePrompts, type CoursePrompt } from "@/storage/database/shared/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 
 export interface ListCoursePromptsOptions {
   full?: boolean;
@@ -42,6 +42,15 @@ export async function findById(id: string) {
     .select()
     .from(coursePrompts)
     .where(eq(coursePrompts.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function findByStageCode(stageCode: string) {
+  const rows = await db
+    .select()
+    .from(coursePrompts)
+    .where(and(eq(coursePrompts.stageCode, stageCode), eq(coursePrompts.isActive, true)))
     .limit(1);
   return rows[0] ?? null;
 }
