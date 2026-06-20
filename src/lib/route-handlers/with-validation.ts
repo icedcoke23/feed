@@ -15,7 +15,9 @@ export function withValidation<T>(
       const validated: RouteContext = { ...ctx };
 
       if (schemas.params && ctx.params) {
-        validated.params = schemas.params.parse(ctx.params);
+        const params =
+          ctx.params instanceof Promise ? await ctx.params : ctx.params;
+        validated.params = schemas.params.parse(params);
       }
 
       if (schemas.query) {
