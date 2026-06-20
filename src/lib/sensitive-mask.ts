@@ -20,11 +20,11 @@ export function maskEmail(email: string | null | undefined): string | null {
   return `${localPart[0]}${"*".repeat(localPart.length - 2)}${localPart.slice(-1)}@${domain}`;
 }
 
-/** API Key 脱敏：保留前4位和后4位，中间用 **** 替代 */
+/** API Key 脱敏：保留前4位和后3位，中间用 * 替代 */
 export function maskApiKey(key: string | null | undefined): string | null {
   if (!key) return null;
   if (key.length <= 8) return "****";
-  return `${key.slice(0, 4)}****${key.slice(-4)}`;
+  return `${key.slice(0, 4)}${"*".repeat(key.length - 7)}${key.slice(-3)}`;
 }
 
 /** URL 脱敏：只保留协议和主机名，路径和查询参数用 /... 替代 */

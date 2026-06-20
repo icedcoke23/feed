@@ -23,6 +23,10 @@ export async function listCourseStages() {
   return cached("lookup:course-stages", lookupRepo.listCourseStages);
 }
 
+export async function listGrades() {
+  return [];
+}
+
 export async function listActiveTeachers() {
   return cached("lookup:teachers", lookupRepo.listActiveTeachers);
 }
