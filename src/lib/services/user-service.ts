@@ -237,6 +237,38 @@ export async function resetPassword(
   }
 
   await repo.update(id, { password: await hashPassword(input.newPassword) });
+}
 
-  return { success: true };
+export async function ensureDefaultAdmin(user: AuthUserResult) {
+  if (!isAdmin(user)) return forbiddenError("权限不足");
+
+  const { getDefaultAdminPassword } = await import("@/lib/config/default-admins");
+  const password = getDefaultAdminPassword();
+
+  const existing = await repo.findByUsername("admin");
+  if (existing) {
+    const updated = await repo.update(existing.id, {
+      password: await hashPassword(password),
+      isActive: true,
+    });
+    const [enriched] = await enrichUsers([updated!]);
+    return { user: enriched, isNew: false };
+  }
+
+  const created = await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(users)
+      .values({
+        username: "admin",
+        name: "系统管理员",
+        role: "admin",
+        password: await hashPassword(password),
+        isActive: true,
+      })
+      .returning();
+    return inserted[0];
+  });
+
+  const [enriched] = await enrichUsers([created]);
+  return { user: enriched, isNew: true };
 }

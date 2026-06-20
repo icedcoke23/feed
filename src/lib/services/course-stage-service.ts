@@ -79,6 +79,36 @@ export async function create(
   return toResponse(stage);
 }
 
+export async function fixActiveStages(user: AuthUserResult) {
+  if (!isAdmin(user)) {
+    return forbiddenError("仅管理员可访问");
+  }
+
+  const activeStages = await repo.listAllActive();
+  if (activeStages.length <= 1) {
+    return { changed: 0, total: activeStages.length };
+  }
+
+  const [first, ...rest] = activeStages;
+  await repo.batchUpdateActive(
+    rest.map((s) => s.id),
+    false
+  );
+  await repo.batchUpdateActive([first.id], true);
+
+  return { changed: rest.length, total: activeStages.length };
+}
+
+export async function resetToDefaults(user: AuthUserResult) {
+  if (!isAdmin(user)) {
+    return forbiddenError("仅管理员可访问");
+  }
+
+  const { DEFAULT_COURSE_STAGES } = await import("@/lib/constants/course-stages");
+  const rows = await repo.resetToDefaults(DEFAULT_COURSE_STAGES);
+  return { count: rows.length };
+}
+
 export async function update(
   user: AuthUserResult,
   id: string,

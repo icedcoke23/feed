@@ -33,6 +33,11 @@ export async function create(payload: typeof teachingThemes.$inferInsert) {
   return rows[0];
 }
 
+export async function batchCreate(payloads: (typeof teachingThemes.$inferInsert)[]) {
+  if (payloads.length === 0) return [];
+  return db.insert(teachingThemes).values(payloads).returning();
+}
+
 export async function update(id: string, payload: Partial<typeof teachingThemes.$inferInsert>) {
   const rows = await db.update(teachingThemes).set(payload).where(eq(teachingThemes.id, id)).returning();
   return rows[0] ?? null;

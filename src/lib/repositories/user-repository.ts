@@ -49,6 +49,15 @@ export async function findById(id: string) {
   return rows[0] ?? null;
 }
 
+export async function findByUsername(username: string) {
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function create(payload: typeof users.$inferInsert) {
   const rows = await db.insert(users).values(payload).returning();
   return rows[0];

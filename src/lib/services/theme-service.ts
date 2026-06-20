@@ -27,6 +27,16 @@ export async function create(
   return repo.create(payload);
 }
 
+export async function batchCreate(
+  user: AuthUserResult,
+  payloads: Parameters<typeof repo.batchCreate>[0]
+) {
+  if (!isAdmin(user)) {
+    return forbiddenError("权限不足");
+  }
+  return repo.batchCreate(payloads);
+}
+
 export async function update(
   user: AuthUserResult,
   id: string,
