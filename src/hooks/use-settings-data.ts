@@ -24,7 +24,6 @@ export function useCourseStages() {
     mutate,
   } = useSWR<CourseStage[]>(COURSE_STAGES_KEY, fetcher, {
     ...defaultSwrConfig,
-    revalidateOnMount: false,
     onError: () => toast.error("获取课程阶段失败"),
   });
   const [saving, setSaving] = useState(false);
@@ -199,7 +198,6 @@ export function useTags() {
     mutate,
   } = useSWR<Tag[]>(TAGS_KEY, fetcher, {
     ...defaultSwrConfig,
-    revalidateOnMount: false,
     onError: () => toast.error("获取标签失败"),
   });
   const [saving, setSaving] = useState(false);
@@ -302,7 +300,6 @@ export function useThemes() {
     mutate,
   } = useSWR<Theme[]>(THEMES_KEY, fetcher, {
     ...defaultSwrConfig,
-    revalidateOnMount: false,
     onError: () => toast.error("获取教学主题失败"),
   });
   const [saving, setSaving] = useState(false);
@@ -404,7 +401,6 @@ export function useAISettings() {
     mutate,
   } = useSWR<AISettings>(AI_SETTINGS_KEY, fetcher, {
     ...defaultSwrConfig,
-    revalidateOnMount: false,
     onError: () => toast.error("获取AI设置失败"),
   });
   const [aiSettings, setAiSettings] = useState<AISettings>({
@@ -570,7 +566,6 @@ export function useUsers(userRole?: string) {
     mutate,
   } = useSWR<UserItem[]>(USERS_KEY, fetcher, {
     ...defaultSwrConfig,
-    revalidateOnMount: false,
     onError: () => toast.error("获取用户列表失败"),
   });
   const [saving, setSaving] = useState(false);

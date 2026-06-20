@@ -58,14 +58,14 @@ export async function fetchStudentById(id: string) {
       return {
         id: cls.id,
         name: cls.name,
-        grade: cls.grade,
-        schedule: cls.schedule,
-        teacher_id: cls.teacherId,
+        grade: cls.grade || undefined,
+        schedule: cls.schedule || undefined,
+        teacher_id: cls.teacherId || undefined,
         is_primary: rel.isPrimary,
-        teacher: teacher ? { id: teacher.id, name: teacher.name, phone: teacher.phone } : null,
+        teacher: teacher ? { id: teacher.id, name: teacher.name, phone: teacher.phone || undefined } : undefined,
       };
     })
-    .filter(Boolean);
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   const primaryClass = student.classId ? classMap.get(student.classId) || null : null;
   const primaryTeacher = primaryClass?.teacherId ? teacherMap.get(primaryClass.teacherId) || null : null;
@@ -73,47 +73,59 @@ export async function fetchStudentById(id: string) {
   return {
     id: student.id,
     name: student.name,
-    grade: student.grade,
-    school: student.school,
-    phone: student.phone,
-    current_class: student.currentClass,
-    class_id: student.classId,
-    current_teacher_id: student.currentTeacherId,
-    admin_teacher_id: student.adminTeacherId,
+    grade: student.grade || undefined,
+    school: student.school || undefined,
+    phone: student.phone || undefined,
+    current_class: student.currentClass || undefined,
+    class_id: student.classId || undefined,
+    current_teacher_id: student.currentTeacherId || undefined,
+    admin_teacher_id: student.adminTeacherId || undefined,
     is_active: student.isActive,
-    created_at: student.createdAt,
-    updated_at: student.updatedAt,
+    created_at: student.createdAt ? student.createdAt.toISOString() : "",
+    updated_at: student.updatedAt ? student.updatedAt.toISOString() : undefined,
     class: primaryClass
       ? {
           id: primaryClass.id,
           name: primaryClass.name,
-          grade: primaryClass.grade,
-          schedule: primaryClass.schedule,
-          teacher_id: primaryClass.teacherId,
-          teacher: primaryTeacher ? { id: primaryTeacher.id, name: primaryTeacher.name, phone: primaryTeacher.phone } : null,
+          grade: primaryClass.grade || undefined,
+          schedule: primaryClass.schedule || undefined,
+          teacher_id: primaryClass.teacherId || undefined,
+          teacher: primaryTeacher ? { id: primaryTeacher.id, name: primaryTeacher.name, phone: primaryTeacher.phone || undefined } : undefined,
         }
-      : null,
+      : undefined,
     classes: studentClassesList,
-    admin_teacher: student.adminTeacherId ? teacherMap.get(student.adminTeacherId) || null : null,
-    current_teacher: student.currentTeacherId ? teacherMap.get(student.currentTeacherId) || null : null,
+    admin_teacher: student.adminTeacherId
+      ? (() => {
+          const t = teacherMap.get(student.adminTeacherId!);
+          if (!t) return undefined;
+          return { id: t.id, name: t.name, phone: t.phone || undefined, email: t.email || undefined };
+        })()
+      : undefined,
+    current_teacher: student.currentTeacherId
+      ? (() => {
+          const t = teacherMap.get(student.currentTeacherId!);
+          if (!t) return undefined;
+          return { id: t.id, name: t.name, phone: t.phone || undefined, email: t.email || undefined };
+        })()
+      : undefined,
     feedbacks: feedbackList.map((f) => ({
       id: f.id,
       status: f.status,
-      created_at: f.createdAt,
-      period_start: f.periodStart,
-      period_end: f.periodEnd,
-      ai_report: f.aiReport,
-      metadata: f.metadata,
-      strengths: f.strengths,
-      improvements: f.improvements,
-      weaknesses: f.weaknesses,
-      suggestions: f.suggestions,
+      created_at: f.createdAt ? f.createdAt.toISOString() : "",
+      period_start: f.periodStart ? f.periodStart.toISOString() : "",
+      period_end: f.periodEnd ? f.periodEnd.toISOString() : "",
+      ai_report: f.aiReport || "",
+      metadata: f.metadata as Record<string, unknown> | null,
+      strengths: f.strengths as string | undefined,
+      improvements: f.improvements as string | undefined,
+      weaknesses: f.weaknesses as string | undefined,
+      suggestions: f.suggestions || undefined,
     })),
     transfers: transfers.map((t) => ({
       id: t.id,
-      from_class: t.fromClass,
-      to_class: t.toClass,
-      transferred_at: t.transferredAt,
+      from_class: t.fromClass || "",
+      to_class: t.toClass || "",
+      transferred_at: t.transferredAt ? t.transferredAt.toISOString() : "",
     })),
   };
 }
