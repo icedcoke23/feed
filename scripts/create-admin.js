@@ -55,7 +55,7 @@ async function createAdmin() {
   });
 
   if (response.ok) {
-    const data = await response.json();
+    await response.json();
     console.log('Admin created successfully!');
     console.log('Username: admin');
     console.log('Password: ********');

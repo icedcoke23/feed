@@ -6,7 +6,7 @@ import type { ClassItem, ParsedStudent } from "@/types/home";
 
 export function useBatchAdd(
   fetchData: () => Promise<void>,
-  classes: ClassItem[]
+  _classes: ClassItem[]
 ) {
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchInput, setBatchInput] = useState("");

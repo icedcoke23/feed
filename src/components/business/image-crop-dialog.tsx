@@ -291,17 +291,6 @@ export function ImageCropDialog({
     }
   }, [open, imageSrc, defaultAspect]);
 
-  // 键盘快捷键
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleConfirm(); }
-      else if (e.key === "Escape") { e.preventDefault(); handleClose(); }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, croppedAreaPixels, imageSrc, cropping, freeCropRect, rotation, flipH, flipV]);
-
   // 滚轮缩放（仅固定比例模式）
   useEffect(() => {
     if (isFreeCrop) return;
@@ -374,6 +363,17 @@ export function ImageCropDialog({
 
   const handleClose = useCallback(() => onClose(), [onClose]);
 
+  // 键盘快捷键
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleConfirm(); }
+      else if (e.key === "Escape") { e.preventDefault(); handleClose(); }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, handleConfirm, handleClose]);
+
   // 自由裁剪的图片加载
   const handleFreeImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -403,6 +403,8 @@ export function ImageCropDialog({
           {isFreeCrop ? (
             // 自由裁剪模式：自研裁剪框
             <>
+              {/* 裁剪源图为动态/数据 URL，且需要 crossOrigin 用于 Canvas 处理，无法使用 Next.js Image */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageSrc}
                 alt="裁剪"

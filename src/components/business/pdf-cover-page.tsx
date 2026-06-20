@@ -175,6 +175,8 @@ export function PdfCoverPage({ reportData, pageStyle, onFieldChange }: PdfCoverP
         {/* Logo区域 - 宽度与纸张一致，下移5% */}
         {LOGO_URL && (
         <div className="flex items-center justify-center" style={{ marginTop: '5%' }}>
+          {/* Logo URL 为可配置的外部/动态地址，用于 PDF/打印，无法使用 Next.js Image */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={LOGO_URL}
             alt="Logo"

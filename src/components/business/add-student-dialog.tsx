@@ -36,7 +36,6 @@ export function AddStudentDialog({
   formData,
   onFormDataChange,
   classes,
-  teachers,
   adminTeachers,
   onSubmit,
 }: AddStudentDialogProps) {

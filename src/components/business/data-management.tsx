@@ -31,7 +31,7 @@ interface DataManagerProps {
   userRole?: string;
 }
 
-export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
+export function DataManager({ onDataChanged, userRole: _userRole }: DataManagerProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);

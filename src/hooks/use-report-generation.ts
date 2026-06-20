@@ -11,7 +11,7 @@ import type {
   GeneratedReport,
 } from "@/types/feedback";
 import { generateDescriptionByRating, parseGeneratedContent } from "@/lib/feedback-utils";
-import { useSSEStream, type ConnectionStatus } from "@/hooks/use-sse-stream";
+import { useSSEStream } from "@/hooks/use-sse-stream";
 
 interface UseReportGenerationOptions {
   students: FeedbackStudent[];

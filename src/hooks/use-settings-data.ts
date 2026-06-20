@@ -33,7 +33,7 @@ export function useCourseStages() {
     await mutate();
   }, [mutate]);
 
-  const saveCourseStage = useCallback(async (editingStage: Partial<CourseStage>, isAdding: boolean) => {
+  const saveCourseStage = useCallback(async (editingStage: Partial<CourseStage>, _isAdding: boolean) => {
     if (!editingStage.stage_name || !editingStage.theme || !editingStage.level) {
       toast.error("请填写必填项");
       return false;
@@ -207,7 +207,7 @@ export function useTags() {
     await mutate();
   }, [mutate]);
 
-  const saveTag = useCallback(async (editingTag: Partial<Tag>, isAddingTag: boolean) => {
+  const saveTag = useCallback(async (editingTag: Partial<Tag>, _isAddingTag: boolean) => {
     if (!editingTag.name || !editingTag.category) {
       toast.error("请填写标签名称和分类");
       return false;
@@ -309,7 +309,7 @@ export function useThemes() {
     await mutate();
   }, [mutate]);
 
-  const saveTheme = useCallback(async (editingTheme: Partial<Theme>, isAddingTheme: boolean) => {
+  const saveTheme = useCallback(async (editingTheme: Partial<Theme>, _isAddingTheme: boolean) => {
     if (!editingTheme.name) {
       toast.error("请填写主题名称");
       return false;
@@ -559,7 +559,7 @@ export function useAISettings() {
   };
 }
 
-export function useUsers(userRole?: string) {
+export function useUsers(_userRole?: string) {
   const {
     data: users = [],
     isLoading: usersLoading,

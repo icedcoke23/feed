@@ -66,6 +66,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
   );
 
   // 同步 photos prop 中的 URL 变更，并重新计算宽高比
+  // 依赖 layouts 会导致 setLayouts 循环触发，这里只在 photos 变化时执行同步
   useEffect(() => {
     let cancelled = false;
     const updateLayouts = async () => {
@@ -92,6 +93,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
     };
     updateLayouts();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photos]);
 
   // 初始化布局：读取每张图片的实际宽高比
@@ -153,7 +155,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
       }, 0);
     };
     initLayouts();
-  }, [currentPhotoIds, prevPhotoIds]);
+  }, [currentPhotoIds, prevPhotoIds, photos]);
 
   // 重试机制：首次计算时容器宽度可能为 0，延迟重新计算
   useEffect(() => {
@@ -275,24 +277,26 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
                   图片加载失败
                 </div>
               ) : (
-              <img
-                src={layout.url}
-                alt="学员照片"
-                loading="eager"
-                onLoad={() => console.log('[Photo] loaded:', layout.id)}
-                onError={() => {
-                  console.error('[Photo] load failed:', layout.id, layout.url);
-                  setFailedImageIds(prev => new Set(prev).add(layout.id));
-                }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  display: 'block',
-                  pointerEvents: 'none',
-                  backgroundColor: '#f5f5f5',
-                }}
-              />
+                // 用户上传/动态 URL，且在 Rnd 自由拖拽缩放容器内，无法使用 Next.js Image
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={layout.url}
+                  alt="学员照片"
+                  loading="eager"
+                  onLoad={() => console.log('[Photo] loaded:', layout.id)}
+                  onError={() => {
+                    console.error('[Photo] load failed:', layout.id, layout.url);
+                    setFailedImageIds(prev => new Set(prev).add(layout.id));
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                    pointerEvents: 'none',
+                    backgroundColor: '#f5f5f5',
+                  }}
+                />
               )}
 
               {/* hover 操作按钮 */}

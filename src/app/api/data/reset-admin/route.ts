@@ -13,7 +13,7 @@ export const POST = withDbError(
   withAuth(
     withValidation(
       { body: resetAdminSchema },
-      async (_req, { authUser, body }) => {
+      async (_req, { authUser }) => {
         const result = await userService.ensureDefaultAdmin(authUser!);
 
         if ("status" in result) {

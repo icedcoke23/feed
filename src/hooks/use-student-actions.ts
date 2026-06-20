@@ -8,7 +8,7 @@ import { EMPTY_STUDENT_FORM } from "@/types/home";
 export function useStudentActions(
   fetchData: () => Promise<void>,
   classes: ClassItem[],
-  teachers: Teacher[]
+  _teachers: Teacher[]
 ) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

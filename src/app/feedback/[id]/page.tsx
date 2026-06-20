@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
-  Calendar,
   User,
-  School,
   Pencil,
 } from "lucide-react";
 import Link from "next/link";
@@ -22,39 +20,38 @@ import { parseAiReport } from "@/utils/ai-report";
 
 export default function FeedbackDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [feedback, setFeedback] = useState<FeedbackDetail | null>(null);
   const [student, setStudent] = useState<Pick<Student, "id" | "name" | "grade" | "school"> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchFeedback = async () => {
+      try {
+        const response = await fetch(`/api/feedbacks/${params.id}`);
+        if (!response.ok) {
+          toast.error("获取反馈报告失败，请刷新页面重试");
+          return;
+        }
+        const data = await response.json();
+        setFeedback(data.data);
+
+        if (data.data?.student_id) {
+          const studentRes = await fetch(`/api/students/${data.data.student_id}`);
+          if (studentRes.ok) {
+            const studentData = await studentRes.json();
+            setStudent(studentData.data);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch feedback:", error);
+        toast.error("获取反馈报告失败，请刷新页面重试");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchFeedback();
   }, [params.id]);
-
-  const fetchFeedback = async () => {
-    try {
-      const response = await fetch(`/api/feedbacks/${params.id}`);
-      if (!response.ok) {
-        toast.error("获取反馈报告失败，请刷新页面重试");
-        return;
-      }
-      const data = await response.json();
-      setFeedback(data.data);
-
-      if (data.data?.student_id) {
-        const studentRes = await fetch(`/api/students/${data.data.student_id}`);
-        if (studentRes.ok) {
-          const studentData = await studentRes.json();
-          setStudent(studentData.data);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch feedback:", error);
-      toast.error("获取反馈报告失败，请刷新页面重试");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
