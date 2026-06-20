@@ -217,26 +217,25 @@ export async function remove(user: AuthUserResult, id: string) {
   });
 }
 
-function generateRandomPassword(length = 12): string {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  const array = new Uint32Array(length);
-  crypto.getRandomValues(array);
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    password += chars[array[i] % chars.length];
-  }
-  return password;
+export interface ResetPasswordInput {
+  newPassword: string;
 }
 
-export async function resetPassword(user: AuthUserResult, id: string) {
+export async function resetPassword(
+  user: AuthUserResult,
+  id: string,
+  input: ResetPasswordInput
+) {
   if (!isAdmin(user)) return forbiddenError("权限不足");
 
   const existing = await repo.findById(id);
   if (!existing) return notFoundError("用户不存在");
 
-  const password = generateRandomPassword();
-  await repo.update(id, { password: await hashPassword(password) });
+  if (!input.newPassword || input.newPassword.length < 6) {
+    return badRequestError("新密码至少6个字符");
+  }
 
-  return { password };
+  await repo.update(id, { password: await hashPassword(input.newPassword) });
+
+  return { success: true };
 }
