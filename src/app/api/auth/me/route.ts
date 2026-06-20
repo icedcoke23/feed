@@ -1,58 +1,40 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, attachRenewedToken } from "@/lib/route-auth";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { NextRequest } from "next/server";
+import { withDbError } from "@/lib/route-handlers/with-db-error";
+import { withAuth } from "@/lib/route-handlers/with-auth";
+import { db } from "@/storage/database/drizzle-client";
+import { users, teachers } from "@/storage/database/shared/schema";
+import { eq } from "drizzle-orm";
+import { successResponse, errorResponse } from "@/lib/api-response";
 
-export async function GET(request: NextRequest) {
-  const authResult = await getAuthUser(request);
-
-  if (!authResult) {
-    return NextResponse.json({ error: "未登录或登录已过期" }, { status: 401 });
-  }
-
-  const client = getServerSupabaseClient();
-  const { data, error } = await client
-    .from("users")
-    .select("id, username, name, role, phone")
-    .eq("id", authResult.userId)
-    .single();
-
-  if (error || !data) {
-    return NextResponse.json({ error: "用户不存在" }, { status: 404 });
-  }
-
-  interface UserWithTeacherRole {
-    id: string;
-    username: string;
-    name: string;
-    role: string;
-    phone?: string;
-    teacherRole?: string;
-  }
-
-  const userData = data as UserWithTeacherRole;
-
-  // 如果是 teacher 角色，关联查询 teachers 表获取 role
-  if (userData.role === "teacher") {
-    const { data: teacherData } = await client
-      .from("teachers")
-      .select("role")
-      .eq("id", userData.id)
-      .single();
-    if (teacherData) {
-      userData.teacherRole = teacherData.role;
+export const GET = withDbError(
+  withAuth(async (req: NextRequest, { authUser }) => {
+    const userRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, authUser!.userId))
+      .limit(1);
+    const user = userRows[0];
+    if (!user) {
+      return errorResponse("用户不存在", 404);
     }
-  }
 
-  const response = NextResponse.json({
-    user: {
-      id: userData.id,
-      username: userData.username,
-      name: userData.name,
-      role: userData.role,
-      teacherRole: userData.teacherRole,
-      phone: userData.phone,
-    },
-  });
+    let teacherRole: string | undefined;
+    if (authUser!.userRole === "teacher") {
+      const teacherRows = await db
+        .select({ role: teachers.role })
+        .from(teachers)
+        .where(eq(teachers.id, authUser!.userId))
+        .limit(1);
+      teacherRole = teacherRows[0]?.role;
+    }
 
-  return attachRenewedToken(response, authResult);
-}
+    return successResponse({
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      phone: user.phone,
+      teacherRole,
+    });
+  })
+);
