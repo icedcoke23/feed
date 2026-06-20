@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    'coverage/**',
   ]),
   {
     files: ['scripts/**/*.js', '.trae/skills/**/*.{js,cjs}'],
