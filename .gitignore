@@ -2,6 +2,7 @@
 
 # Dependencies
 node_modules/
+.pnpm-store/
 .pnp
 .pnp.js
 
@@ -98,3 +99,6 @@ Desktop.ini
 
 .coze-logs
 .cozeproj/reduction
+
+# Worktrees
+.worktrees/

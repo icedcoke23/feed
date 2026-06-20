@@ -272,7 +272,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
                   从JSON文件导入学员、班级、反馈记录等数据
                 </p>
                 <p className="text-xs text-gray-400 mt-2">
-                  支持"增量模式"（合并数据）和"覆盖模式"（清空后导入）
+                  支持“增量模式”（合并数据）和“覆盖模式”（清空后导入）
                 </p>
               </div>
               <div className="flex flex-col items-end gap-2 ml-4">

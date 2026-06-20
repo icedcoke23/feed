@@ -149,7 +149,7 @@ export function UserManagement({
           <CardContent className="p-8 text-center">
             <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">暂无用户</p>
-            <p className="text-sm text-gray-400 mt-2">点击"添加用户"创建新用户</p>
+            <p className="text-sm text-gray-400 mt-2">点击“添加用户”创建新用户</p>
           </CardContent>
         </Card>
       ) : (

@@ -112,6 +112,19 @@ export const GET = withLogging(async (request: NextRequest) => {
         });
       }
 
+      interface StudentClassRelation {
+        student_id: string;
+        class_id: string;
+        is_primary: boolean;
+        classes?: {
+          id: string;
+          name: string;
+          grade?: string;
+          schedule?: string;
+          teacher_id?: string;
+        }[] | null;
+      }
+
       // 合并班级和教师信息
       data.forEach((s: {
         id: string;
@@ -122,11 +135,12 @@ export const GET = withLogging(async (request: NextRequest) => {
         classes?: unknown[];
       }) => {
         // 通过 student_classes 附加 classes 数组
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const relations = (studentClassesResult.data as any[])?.filter((sc: any) => sc.student_id === s.id) || [];
+        const relations = (studentClassesResult.data as StudentClassRelation[] | undefined)?.filter(
+          (sc) => sc.student_id === s.id
+        ) || [];
 
-        s.classes = relations.map((r: any) => {
-          const classInfo = r.classes ? { ...r.classes } : classesMap[r.class_id] || {};
+        s.classes = relations.map((r) => {
+          const classInfo = r.classes?.[0] ? { ...r.classes[0] } : classesMap[r.class_id] || {};
           // 附加教师信息
           if (classInfo.teacher_id && teachersMap[classInfo.teacher_id]) {
             classInfo.teacher = teachersMap[classInfo.teacher_id];
@@ -143,10 +157,10 @@ export const GET = withLogging(async (request: NextRequest) => {
         });
 
         // 主班级信息（向后兼容）
-        const primaryClass = relations.find((r: any) => r.is_primary);
+        const primaryClass = relations.find((r) => r.is_primary);
         if (primaryClass) {
           s.class_id = primaryClass.class_id;
-          const primaryClassInfo = primaryClass.classes ? { ...primaryClass.classes } : classesMap[primaryClass.class_id] || {};
+          const primaryClassInfo = primaryClass.classes?.[0] ? { ...primaryClass.classes[0] } : classesMap[primaryClass.class_id] || {};
           if (primaryClassInfo.teacher_id && teachersMap[primaryClassInfo.teacher_id]) {
             primaryClassInfo.teacher = teachersMap[primaryClassInfo.teacher_id];
           }

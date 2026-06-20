@@ -502,7 +502,7 @@ export async function POST(request: NextRequest) {
         const newId = isOverwrite ? feedbackData.id : crypto.randomUUID();
         
         // 处理学员ID映射
-        let studentId = feedbackData.student_id as string;
+        const studentId = feedbackData.student_id as string;
         // 学员ID通常不变，因为学员已经导入
 
         const feedbackRecord = {

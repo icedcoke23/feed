@@ -92,7 +92,7 @@ export function ThemeManagement({
           <CardContent className="p-8 text-center">
             <Palette className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">暂无教学主题</p>
-            <p className="text-sm text-gray-400 mt-2">点击"添加教学主题"创建新的主题</p>
+            <p className="text-sm text-gray-400 mt-2">点击“添加教学主题”创建新的主题</p>
           </CardContent>
         </Card>
       ) : (

@@ -37,10 +37,20 @@ export async function GET(request: NextRequest) {
       return handleDbError(error, "获取用户列表");
     }
 
-    const users = data || [];
+    interface UserRow {
+      id: string;
+      username: string;
+      name: string;
+      role: string;
+      phone?: string;
+      is_active?: boolean;
+      created_at?: string;
+    }
+
+    const users = (data || []) as UserRow[];
 
     // 为 teacher 角色的用户补充 teacherRole
-    const teacherIds = users.filter((u: any) => u.role === "teacher").map((u: any) => u.id);
+    const teacherIds = users.filter((u) => u.role === "teacher").map((u) => u.id);
     let teacherRoles: Record<string, string> = {};
     if (teacherIds.length > 0) {
       const { data: teachersData } = await client
@@ -48,11 +58,11 @@ export async function GET(request: NextRequest) {
         .select("id, role")
         .in("id", teacherIds);
       if (teachersData) {
-        teacherRoles = Object.fromEntries(teachersData.map((t: any) => [t.id, t.role]));
+        teacherRoles = Object.fromEntries(teachersData.map((t: { id: string; role: string }) => [t.id, t.role]));
       }
     }
 
-    const enrichedUsers = users.map((u: any) => ({
+    const enrichedUsers = users.map((u) => ({
       ...u,
       teacherRole: u.role === "teacher" ? (teacherRoles[u.id] || "teacher") : undefined,
     }));

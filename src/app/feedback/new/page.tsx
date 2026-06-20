@@ -114,7 +114,7 @@ function CreateFeedbackPage() {
   // 进入页面时检测草稿，非编辑模式下提示恢复
   useEffect(() => {
     if (!isEditMode && !loading && form.hasDraft && form.currentStep === 0 && !form.selectedStudentId) {
-      setShowDraftDialog(true);
+      setTimeout(() => setShowDraftDialog(true), 0);
     }
   }, [isEditMode, loading, form.hasDraft, form.currentStep, form.selectedStudentId]);
 

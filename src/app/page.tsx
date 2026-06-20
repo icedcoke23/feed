@@ -122,7 +122,7 @@ export default function HomePage() {
                     {searchQuery || teacherFilter !== "all" ? "未找到匹配的学员" : "暂无学员数据"}
                   </p>
                   <p className="text-gray-400 text-sm mb-4">
-                    点击上方"添加学员"或"批量添加"按钮创建学员
+                    点击上方“添加学员”或“批量添加”按钮创建学员
                   </p>
                   <div className="flex gap-2 justify-center">
                     <Button onClick={() => studentActions.setIsAddDialogOpen(true)}>

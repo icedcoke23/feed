@@ -1,4 +1,5 @@
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { db } from "@/storage/database/drizzle-client";
+import { aiSettings } from "@/storage/database/shared/schema";
 import { DEFAULT_COZE_MODEL, getDefaultPrompt } from "@/lib/constants/ai";
 
 // AI 设置类型
@@ -13,29 +14,21 @@ export interface AISettings {
 
 // 获取 AI 设置（从数据库）
 export async function getAISettings(): Promise<AISettings | null> {
-  const client = getServerSupabaseClient();
-
   try {
-    const { data, error } = await client
-      .from("ai_settings")
-      .select("*");
+    const rows = await db.select().from(aiSettings).limit(1);
+    const data = rows[0];
 
-    if (error || !data) {
+    if (!data) {
       return null;
     }
 
-    const settings: Record<string, string> = {};
-    data.forEach((item: { setting_key: string; setting_value: string }) => {
-      settings[item.setting_key] = item.setting_value || "";
-    });
-
     return {
-      apiKey: settings.api_key || "",
-      baseUrl: settings.base_url || "",
-      modelId: settings.model_id || DEFAULT_COZE_MODEL,
-      maxConcurrent: settings.max_concurrent || "5",
-      systemPrompt: settings.system_prompt || getDefaultPrompt(),
-      useCustomAI: settings.use_custom_ai === "true",
+      apiKey: data.apiKey || "",
+      baseUrl: data.baseUrl || "",
+      modelId: data.modelId || DEFAULT_COZE_MODEL,
+      maxConcurrent: String(data.maxConcurrent ?? 5),
+      systemPrompt: data.systemPrompt || getDefaultPrompt(),
+      useCustomAI: data.useCustomAi ?? false,
     };
   } catch (error) {
     console.error("Failed to get AI settings:", error);

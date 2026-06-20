@@ -67,18 +67,32 @@ export async function GET(
       }
     }
 
+    interface ClassInfo {
+      id?: string;
+      name?: string;
+      grade?: string;
+      schedule?: string;
+      teacher_id?: string;
+      teacher?: unknown;
+    }
+
+    interface StudentClassRelation {
+      class_id: string;
+      is_primary: boolean;
+      classes?: ClassInfo[] | null;
+    }
+
     // 通过 student_classes 附加 classes 数组
     if (studentClassesResult.data && studentClassesResult.data.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const scData = studentClassesResult.data as any[];
+      const scData = studentClassesResult.data as StudentClassRelation[];
 
       // 收集所有班级的 teacher_id
       const classTeacherIds = scData
-        .map((sc: any) => sc.classes?.teacher_id)
+        .map((sc) => sc.classes?.[0]?.teacher_id)
         .filter(Boolean) as string[];
 
       // 批量查询教师信息
-      let teachersMap: Record<string, { id: string; name: string; phone?: string }> = {};
+      const teachersMap: Record<string, { id: string; name: string; phone?: string }> = {};
       if (classTeacherIds.length > 0) {
         const { data: classTeachersData } = await client
           .from("teachers")
@@ -91,8 +105,8 @@ export async function GET(
         }
       }
 
-      student.classes = scData.map((sc: any) => {
-        const classInfo = sc.classes || {};
+      student.classes = scData.map((sc) => {
+        const classInfo: ClassInfo = sc.classes?.[0] || {};
         return {
           id: classInfo.id,
           name: classInfo.name,
@@ -105,9 +119,9 @@ export async function GET(
       });
 
       // 主班级信息（向后兼容）
-      const primaryClass = scData.find((sc: any) => sc.is_primary);
+      const primaryClass = scData.find((sc) => sc.is_primary);
       if (primaryClass) {
-        const primaryClassInfo = primaryClass.classes ? { ...primaryClass.classes } : {};
+        const primaryClassInfo: ClassInfo = primaryClass.classes?.[0] ? { ...primaryClass.classes[0] } : {};
         if (primaryClassInfo.teacher_id && teachersMap[primaryClassInfo.teacher_id]) {
           primaryClassInfo.teacher = teachersMap[primaryClassInfo.teacher_id];
         }

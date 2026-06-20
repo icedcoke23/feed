@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
+        setTimeout(() => setUser(parsedUser), 0);
         // 验证 token 是否仍然有效（通过调用一个需要认证的 API）
         fetch("/api/auth/me", { credentials: "include" })
           .then(res => {
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
-    setIsLoading(false);
+    setTimeout(() => setIsLoading(false), 0);
   }, []);
 
   const login = async (username: string, password: string) => {

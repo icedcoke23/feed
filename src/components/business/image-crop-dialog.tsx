@@ -118,7 +118,7 @@ function FreeCropOverlay({
       const dy = (e.clientY - my) / containerHeight;
       const MIN = 0.05;
 
-      let newRect = { ...rect };
+      const newRect = { ...rect };
       const handle = dragging;
 
       if (handle === "move") {
@@ -163,7 +163,7 @@ function FreeCropOverlay({
       const dx = (e.touches[0].clientX - mx) / containerWidth;
       const dy = (e.touches[0].clientY - my) / containerHeight;
       const MIN = 0.05;
-      let newRect = { ...rect };
+      const newRect = { ...rect };
       const handle = dragging;
       if (handle === "move") {
         newRect.x = Math.max(0, Math.min(1 - rect.width, rect.x + dx));

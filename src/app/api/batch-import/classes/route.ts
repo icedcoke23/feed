@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       studentsCreated: 0,
       studentsLinked: 0,
       errors: [] as string[],
-      details: [] as any[],
+      details: [] as { className: string; teacher: string; studentsCount: number }[],
     };
     
     // 获取现有学员列表，避免重复创建

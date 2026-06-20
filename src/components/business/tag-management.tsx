@@ -134,7 +134,7 @@ export function TagManagement({
           <CardContent className="p-8 text-center">
             <Tag className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">暂无标签</p>
-            <p className="text-sm text-gray-400 mt-2">点击"添加标签"创建评价标签</p>
+            <p className="text-sm text-gray-400 mt-2">点击“添加标签”创建评价标签</p>
           </CardContent>
         </Card>
       ) : (
