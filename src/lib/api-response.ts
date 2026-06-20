@@ -7,16 +7,10 @@ export function successResponse<T>(data: T, message?: string, status = 200) {
   return NextResponse.json(body, { status });
 }
 
-// Error response: { error: string, code?: string, ...extra }
-export function errorResponse(
-  error: string,
-  status = 400,
-  code?: string,
-  extra?: Record<string, unknown>
-) {
+// Error response: { error: string, code?: string }
+export function errorResponse(error: string, status = 400, code?: string) {
   const body: Record<string, unknown> = { error };
   if (code) body.code = code;
-  if (extra) Object.assign(body, extra);
   return NextResponse.json(body, { status });
 }
 

@@ -34,7 +34,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
   const editIdFromUrl = searchParams.get("editId");
 
   // 编辑模式
-  const [editId] = useState<string | null>(editIdFromUrl);
+  const [editId, setEditId] = useState<string | null>(editIdFromUrl);
   const [editLoading, setEditLoading] = useState(!!editIdFromUrl);
   const isEditMode = !!editIdFromUrl;
 
@@ -492,7 +492,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
     } finally {
       setAddingCustomTag(false);
     }
-  }, [customTagName, customTagNote, customTagRating, customTagCategory, setTags]);
+  }, [customTagName, customTagNote, customTagRating, customTagCategory]);
 
   // 保存状态
   const [saving, setSaving] = useState(false);
@@ -629,7 +629,7 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
     } finally {
       setSaving(false);
     }
-  }, [selectedStudentId, generatedReport, students, teachers, adminTeachers, themes, selectedThemeId, selectedTeacherId, selectedAdminTeacherId, feedbackDate, tagRatings, tags, hasCoursePlan, coursePlans, currentStageId, editId, clearDraft, studentPhotos]);
+  }, [selectedStudentId, generatedReport, students, teachers, themes, selectedThemeId, selectedTeacherId, selectedAdminTeacherId, feedbackDate, tagRatings, tags, hasCoursePlan, coursePlans, currentStageId, editId, clearDraft, studentPhotos]);
 
   // 步骤导航
   const canProceed = useCallback(() => {

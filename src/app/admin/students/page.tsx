@@ -35,6 +35,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -46,6 +47,8 @@ import {
   Edit,
   Trash2,
   Filter,
+  Download,
+  UserPlus,
   Loader2,
 } from "lucide-react";
 import Link from "next/link";

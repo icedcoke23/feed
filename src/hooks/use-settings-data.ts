@@ -1,39 +1,38 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import useSWR from "swr";
 import { toast } from "sonner";
 import type { CourseStage, Tag, Theme, AISettings, UserItem } from "@/types/settings";
 import { DEFAULT_COURSE_STAGES as DEFAULT_PRESETS } from "@/lib/constants/course-stages";
 import { getDefaultPrompt } from "@/lib/constants/ai";
 import type { ConfirmDialogState } from "@/components/business/confirm-dialog";
 import { INITIAL_CONFIRM_STATE, createConfirmState } from "@/components/business/confirm-dialog";
-import { fetcher, defaultSwrConfig } from "@/lib/swr";
-import {
-  COURSE_STAGES_KEY,
-  TAGS_KEY,
-  THEMES_KEY,
-  AI_SETTINGS_KEY,
-  USERS_KEY,
-} from "@/lib/swr";
 
 export function useCourseStages() {
-  const {
-    data: courseStages = [],
-    isLoading: loading,
-    mutate,
-  } = useSWR<CourseStage[]>(COURSE_STAGES_KEY, fetcher, {
-    ...defaultSwrConfig,
-    onError: () => toast.error("获取课程阶段失败"),
-  });
+  const [courseStages, setCourseStages] = useState<CourseStage[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchCourseStages = useCallback(async () => {
-    await mutate();
-  }, [mutate]);
+    setLoading(true);
+    try {
+      const response = await fetch("/api/course-stages", { credentials: "include" });
+      if (!response.ok) {
+        toast.error("获取课程阶段失败");
+        return;
+      }
+      const data = await response.json();
+      setCourseStages(data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch course stages:", error);
+      toast.error("获取课程阶段失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const saveCourseStage = useCallback(async (editingStage: Partial<CourseStage>, _isAdding: boolean) => {
+  const saveCourseStage = useCallback(async (editingStage: Partial<CourseStage>, isAdding: boolean) => {
     if (!editingStage.stage_name || !editingStage.theme || !editingStage.level) {
       toast.error("请填写必填项");
       return false;
@@ -67,7 +66,7 @@ export function useCourseStages() {
 
       if (response.ok) {
         toast.success(isNew ? "添加成功" : "更新成功");
-        await mutate();
+        fetchCourseStages();
         return true;
       } else {
         const error = await response.json();
@@ -81,7 +80,7 @@ export function useCourseStages() {
     } finally {
       setSaving(false);
     }
-  }, [mutate]);
+  }, [fetchCourseStages]);
 
   const deleteCourseStage = useCallback(async (id: string) => {
     setConfirmDialog(createConfirmState({
@@ -95,16 +94,16 @@ export function useCourseStages() {
           const response = await fetch(`/api/course-stages/${id}`, { method: "DELETE", credentials: "include" });
           if (response.ok) {
             toast.success("删除成功");
-            await mutate();
+            fetchCourseStages();
           } else {
             toast.error("删除失败");
           }
-        } catch {
+        } catch (error) {
           toast.error("删除失败");
         }
       },
     }));
-  }, [mutate]);
+  }, [fetchCourseStages]);
 
   const addDefaultPresets = useCallback(async () => {
     setConfirmDialog(createConfirmState({
@@ -134,15 +133,15 @@ export function useCourseStages() {
             if (response.ok) successCount++;
           }
           toast.success(`成功添加 ${successCount} 个预设`);
-          await mutate();
-        } catch {
+          fetchCourseStages();
+        } catch (error) {
           toast.error("添加预设失败");
         } finally {
           setSaving(false);
         }
       },
     }));
-  }, [mutate]);
+  }, [fetchCourseStages]);
 
   const resetToPresets = useCallback(async () => {
     setConfirmDialog(createConfirmState({
@@ -163,19 +162,19 @@ export function useCourseStages() {
           if (response.ok) {
             const result = await response.json();
             toast.success(result.message || "重置成功");
-            await mutate();
+            fetchCourseStages();
           } else {
             const error = await response.json();
             toast.error(error.error || "重置失败");
           }
-        } catch {
+        } catch (error) {
           toast.error("重置失败");
         } finally {
           setSaving(false);
         }
       },
     }));
-  }, [mutate]);
+  }, [fetchCourseStages]);
 
   return {
     courseStages,
@@ -192,22 +191,30 @@ export function useCourseStages() {
 }
 
 export function useTags() {
-  const {
-    data: tags = [],
-    isLoading: tagsLoading,
-    mutate,
-  } = useSWR<Tag[]>(TAGS_KEY, fetcher, {
-    ...defaultSwrConfig,
-    onError: () => toast.error("获取标签失败"),
-  });
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchTags = useCallback(async () => {
-    await mutate();
-  }, [mutate]);
+    setTagsLoading(true);
+    try {
+      const response = await fetch("/api/tags", { credentials: "include" });
+      if (!response.ok) {
+        toast.error("获取标签失败");
+        return;
+      }
+      const data = await response.json();
+      setTags(data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch tags:", error);
+      toast.error("获取标签失败");
+    } finally {
+      setTagsLoading(false);
+    }
+  }, []);
 
-  const saveTag = useCallback(async (editingTag: Partial<Tag>, _isAddingTag: boolean) => {
+  const saveTag = useCallback(async (editingTag: Partial<Tag>, isAddingTag: boolean) => {
     if (!editingTag.name || !editingTag.category) {
       toast.error("请填写标签名称和分类");
       return false;
@@ -242,7 +249,7 @@ export function useTags() {
 
       if (response.ok) {
         toast.success(isNew ? "添加成功" : "更新成功");
-        await mutate();
+        fetchTags();
         return true;
       } else {
         const error = await response.json();
@@ -256,7 +263,7 @@ export function useTags() {
     } finally {
       setSaving(false);
     }
-  }, [mutate]);
+  }, [fetchTags]);
 
   const deleteTag = useCallback(async (id: string) => {
     setConfirmDialog(createConfirmState({
@@ -270,16 +277,16 @@ export function useTags() {
           const response = await fetch(`/api/tags/${id}`, { method: "DELETE", credentials: "include" });
           if (response.ok) {
             toast.success("删除成功");
-            await mutate();
+            fetchTags();
           } else {
             toast.error("删除失败");
           }
-        } catch {
+        } catch (error) {
           toast.error("删除失败");
         }
       },
     }));
-  }, [mutate]);
+  }, [fetchTags]);
 
   return {
     tags,
@@ -294,22 +301,30 @@ export function useTags() {
 }
 
 export function useThemes() {
-  const {
-    data: themes = [],
-    isLoading: themesLoading,
-    mutate,
-  } = useSWR<Theme[]>(THEMES_KEY, fetcher, {
-    ...defaultSwrConfig,
-    onError: () => toast.error("获取教学主题失败"),
-  });
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [themesLoading, setThemesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchThemes = useCallback(async () => {
-    await mutate();
-  }, [mutate]);
+    setThemesLoading(true);
+    try {
+      const response = await fetch("/api/themes", { credentials: "include" });
+      if (!response.ok) {
+        toast.error("获取教学主题失败");
+        return;
+      }
+      const data = await response.json();
+      setThemes(data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch themes:", error);
+      toast.error("获取教学主题失败");
+    } finally {
+      setThemesLoading(false);
+    }
+  }, []);
 
-  const saveTheme = useCallback(async (editingTheme: Partial<Theme>, _isAddingTheme: boolean) => {
+  const saveTheme = useCallback(async (editingTheme: Partial<Theme>, isAddingTheme: boolean) => {
     if (!editingTheme.name) {
       toast.error("请填写主题名称");
       return false;
@@ -344,7 +359,7 @@ export function useThemes() {
 
       if (response.ok) {
         toast.success(isNew ? "添加成功" : "更新成功");
-        await mutate();
+        fetchThemes();
         return true;
       } else {
         const error = await response.json();
@@ -358,7 +373,7 @@ export function useThemes() {
     } finally {
       setSaving(false);
     }
-  }, [mutate]);
+  }, [fetchThemes]);
 
   const deleteTheme = useCallback(async (id: string) => {
     setConfirmDialog(createConfirmState({
@@ -372,16 +387,16 @@ export function useThemes() {
           const response = await fetch(`/api/themes/${id}`, { method: "DELETE", credentials: "include" });
           if (response.ok) {
             toast.success("删除成功");
-            await mutate();
+            fetchThemes();
           } else {
             toast.error("删除失败");
           }
-        } catch {
+        } catch (error) {
           toast.error("删除失败");
         }
       },
     }));
-  }, [mutate]);
+  }, [fetchThemes]);
 
   return {
     themes,
@@ -396,13 +411,6 @@ export function useThemes() {
 }
 
 export function useAISettings() {
-  const {
-    isLoading: aiSettingsLoading,
-    mutate,
-  } = useSWR<AISettings>(AI_SETTINGS_KEY, fetcher, {
-    ...defaultSwrConfig,
-    onError: () => toast.error("获取AI设置失败"),
-  });
   const [aiSettings, setAiSettings] = useState<AISettings>({
     api_key: "",
     base_url: "",
@@ -411,16 +419,36 @@ export function useAISettings() {
     system_prompt: "",
     use_custom_ai: "false",
   });
+  const [aiSettingsLoading, setAiSettingsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchAISettings = useCallback(async () => {
-    const result = await mutate();
-    if (result) {
-      setAiSettings(result);
+    setAiSettingsLoading(true);
+    try {
+      const response = await fetch("/api/ai-settings", { credentials: "include" });
+      if (!response.ok) {
+        toast.error("获取AI设置失败");
+        return;
+      }
+      const data = await response.json();
+      const settings = data.data;
+      setAiSettings({
+        api_key: settings?.api_key || "",
+        base_url: settings?.base_url || "",
+        model_id: settings?.model_id || "",
+        max_concurrent: settings?.max_concurrent || "5",
+        system_prompt: settings?.system_prompt || "",
+        use_custom_ai: settings?.use_custom_ai || "false",
+      });
+    } catch (error) {
+      console.error("Failed to fetch AI settings:", error);
+      toast.error("获取AI设置失败");
+    } finally {
+      setAiSettingsLoading(false);
     }
-  }, [mutate]);
+  }, []);
 
   const saveAISettings = useCallback(async () => {
     setSaving(true);
@@ -434,7 +462,6 @@ export function useAISettings() {
 
       if (response.ok) {
         toast.success("AI设置保存成功");
-        await mutate();
       } else {
         toast.error("保存失败");
       }
@@ -444,7 +471,7 @@ export function useAISettings() {
     } finally {
       setSaving(false);
     }
-  }, [aiSettings, mutate]);
+  }, [aiSettings]);
 
   const testConnection = useCallback(async () => {
     setTestingConnection(true);
@@ -529,10 +556,6 @@ export function useAISettings() {
 
           if (response.ok) {
             toast.success("提示词已重置为默认值");
-            const result = await mutate();
-            if (result) {
-              setAiSettings(result);
-            }
           } else {
             toast.error("重置提示词失败，保存到数据库时出错");
           }
@@ -542,7 +565,7 @@ export function useAISettings() {
         }
       },
     }));
-  }, [mutate]);
+  }, []);
 
   return {
     aiSettings,
@@ -559,21 +582,29 @@ export function useAISettings() {
   };
 }
 
-export function useUsers(_userRole?: string) {
-  const {
-    data: users = [],
-    isLoading: usersLoading,
-    mutate,
-  } = useSWR<UserItem[]>(USERS_KEY, fetcher, {
-    ...defaultSwrConfig,
-    onError: () => toast.error("获取用户列表失败"),
-  });
+export function useUsers(userRole?: string) {
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchUsers = useCallback(async () => {
-    await mutate();
-  }, [mutate]);
+    setUsersLoading(true);
+    try {
+      const response = await fetch("/api/users", { credentials: "include" });
+      if (!response.ok) {
+        toast.error("获取用户列表失败");
+        return;
+      }
+      const data = await response.json();
+      setUsers(data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      toast.error("获取用户列表失败");
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
 
   const saveUser = useCallback(async (editingUser: Partial<UserItem>, isAddingUser: boolean) => {
     if (!editingUser.username || !editingUser.name) {
@@ -618,7 +649,7 @@ export function useUsers(_userRole?: string) {
 
       if (response.ok) {
         toast.success(isNew ? "添加成功" : "更新成功");
-        await mutate();
+        fetchUsers();
         return true;
       } else {
         const error = await response.json();
@@ -632,7 +663,7 @@ export function useUsers(_userRole?: string) {
     } finally {
       setSaving(false);
     }
-  }, [mutate]);
+  }, [fetchUsers]);
 
   const deleteUser = useCallback(async (id: string) => {
     setConfirmDialog(createConfirmState({
@@ -646,17 +677,17 @@ export function useUsers(_userRole?: string) {
           const response = await fetch(`/api/users/${id}`, { method: "DELETE", credentials: "include" });
           if (response.ok) {
             toast.success("删除成功");
-            await mutate();
+            fetchUsers();
           } else {
             const error = await response.json();
             toast.error(error.error || "删除失败");
           }
-        } catch {
+        } catch (error) {
           toast.error("删除失败");
         }
       },
     }));
-  }, [mutate]);
+  }, [fetchUsers]);
 
   return {
     users,

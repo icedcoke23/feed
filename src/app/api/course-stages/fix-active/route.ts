@@ -1,31 +1,37 @@
-import { z } from "zod";
-import { withDbError } from "@/lib/route-handlers/with-db-error";
-import { withAuth } from "@/lib/route-handlers/with-auth";
-import { withValidation } from "@/lib/route-handlers/with-validation";
-import { successResponse } from "@/lib/api-response";
-import * as courseStageService from "@/lib/services/course-stage-service";
+import { NextRequest } from "next/server";
+import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { handleDbError, forbiddenError } from "@/lib/api-error";
+import { getAuthUser } from "@/lib/route-auth";
+import { successResponse, errorResponse } from "@/lib/api-response";
 
-const fixActiveSchema = z.object({
-  confirm: z.literal("FIX_ACTIVE"),
-});
+// PATCH /api/course-stages/fix-active - 修复 is_active 字段
+export async function PATCH(request: NextRequest) {
+  const authUser = await getAuthUser(request);
+  if (!authUser) {
+    return errorResponse("未授权访问", 401);
+  }
 
-export const POST = withDbError(
-  withAuth(
-    withValidation(
-      { body: fixActiveSchema },
-      async (_req, { authUser, body }) => {
-        void body;
-        const result = await courseStageService.fixActiveStages(authUser!);
+  if (authUser.userRole !== "admin") {
+    return forbiddenError("仅管理员可访问");
+  }
 
-        if ("status" in result) {
-          return result;
-        }
+  const client = getServerSupabaseClient();
 
-        return successResponse(
-          result,
-          `已修复，共 ${result.total} 个活跃阶段，禁用 ${result.changed} 个`
-        );
-      }
-    )
-  )
-);
+  try {
+    // 将所有 is_active 为 null 的记录更新为 true
+    const { data, error } = await client
+      .from("course_stages")
+      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .is("is_active", null)
+      .select();
+
+    if (error) {
+      return handleDbError(error, "修复is_active");
+    }
+
+    return successResponse(data, `已修复 ${data?.length || 0} 条记录`);
+  } catch (error) {
+    console.error("Error fixing is_active:", error);
+    return errorResponse("Internal server error", 500);
+  }
+}

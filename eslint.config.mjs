@@ -12,21 +12,11 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
-    'coverage/**',
   ]),
   {
     files: ['scripts/**/*.js', '.trae/skills/**/*.{js,cjs}'],
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
-    },
-  },
-  {
-    rules: {
-      '@typescript-eslint/no-unused-vars': ['warn', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_',
-      }],
     },
   },
 ]);

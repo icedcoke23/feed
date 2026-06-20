@@ -37,6 +37,7 @@ export function EditStudentDialog({
   formData,
   onFormDataChange,
   classes,
+  teachers,
   adminTeachers,
   saving,
   onSubmit,

@@ -8,13 +8,6 @@
       "when": 1781935667800,
       "tag": "0000_equal_harpoon",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1781949000000,
-      "tag": "0001_indexes_and_triggers",
-      "breakpoints": true
     }
   ]
 }

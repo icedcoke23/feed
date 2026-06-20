@@ -259,8 +259,6 @@ export function StudentPhotos({
                   className="relative group rounded-lg overflow-hidden border bg-gray-50"
                   style={{ aspectRatio: "4/3" }}
                 >
-                  {/* 用户上传照片，URL 为动态/数据地址，无法使用 Next.js Image */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photo.url}
                     alt={`学员照片 ${index + 1}`}
