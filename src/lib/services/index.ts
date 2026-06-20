@@ -7,5 +7,8 @@ export * as userService from "./user-service";
 export * as aiSettingService from "./ai-setting-service";
 export * as lookupService from "./lookup-service";
 export * as coursePromptService from "./course-prompt-service";
+export * as courseStageService from "./course-stage-service";
+export * as tagService from "./tag-service";
+export * as themeService from "./theme-service";
 export * as dataService from "./data-service";
 export * as homeService from "./home-service";

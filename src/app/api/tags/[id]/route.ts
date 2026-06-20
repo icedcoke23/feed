@@ -1,107 +1,57 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
-import { validateInput } from "@/lib/validations";
+import { z } from "zod";
+import { withDbError } from "@/lib/route-handlers/with-db-error";
+import { withAuth } from "@/lib/route-handlers/with-auth";
+import { withValidation } from "@/lib/route-handlers/with-validation";
+import { successResponse } from "@/lib/api-response";
+import { tagService } from "@/lib/services";
 import { insertTagSchema } from "@/storage/database/shared/schema";
-import { handleDbError } from "@/lib/api-error";
-import { getAuthUser } from "@/lib/route-auth";
-import { successResponse, errorResponse } from "@/lib/api-response";
 
-// GET /api/tags/[id] - 获取单个标签
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const authUser = await getAuthUser(request);
-  if (!authUser) {
-    return errorResponse("未授权访问", 401);
-  }
+const paramsSchema = z.object({ id: z.string().uuid() });
 
-  const client = getServerSupabaseClient();
-  const { id } = await params;
+const bodySchema = insertTagSchema.partial();
 
-  try {
-    const { data, error } = await client
-      .from("tags")
-      .select("*")
-      .eq("id", id)
-      .single();
+export const GET = withDbError(
+  withAuth(
+    withValidation(
+      { params: paramsSchema },
+      async (req, { authUser, params }) => {
+        const { id } = params as { id: string };
+        const result = await tagService.findById(authUser!, id);
+        if (result instanceof Response) return result;
+        return successResponse(result);
+      }
+    )
+  )
+);
 
-    if (error) {
-      return handleDbError(error, "获取标签");
-    }
+export const PUT = withDbError(
+  withAuth(
+    withValidation(
+      { params: paramsSchema, body: bodySchema },
+      async (req, { authUser, params, body }) => {
+        const { id } = params as { id: string };
+        const result = await tagService.update(
+          authUser!,
+          id,
+          body as Parameters<typeof tagService.update>[2]
+        );
+        if (result instanceof Response) return result;
+        return successResponse(result, "更新成功");
+      }
+    )
+  )
+);
 
-    return successResponse(data);
-  } catch (error) {
-    return handleDbError(error, "获取标签");
-  }
-}
-
-// PUT /api/tags/[id] - 更新标签
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const authUser = await getAuthUser(request);
-  if (!authUser) {
-    return errorResponse("未授权访问", 401);
-  }
-
-  const client = getServerSupabaseClient();
-  const { id } = await params;
-  const body = await request.json();
-
-  const result = validateInput(insertTagSchema.partial(), body);
-  if ("error" in result) return result.error;
-  const validatedData = result.data;
-
-  try {
-    const { data, error } = await client
-      .from("tags")
-      .update({
-        category: validatedData.category,
-        name: validatedData.name,
-        description: validatedData.description,
-        sort_order: validatedData.sortOrder,
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      return handleDbError(error, "更新标签");
-    }
-
-    return successResponse(data);
-  } catch (error) {
-    return handleDbError(error, "更新标签");
-  }
-}
-
-// DELETE /api/tags/[id] - 删除标签（软删除）
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const authUser = await getAuthUser(request);
-  if (!authUser) {
-    return errorResponse("未授权访问", 401);
-  }
-
-  const client = getServerSupabaseClient();
-  const { id } = await params;
-
-  try {
-    const { error } = await client
-      .from("tags")
-      .update({ is_active: false })
-      .eq("id", id);
-
-    if (error) {
-      return handleDbError(error, "删除标签");
-    }
-
-    return successResponse(null, "删除成功");
-  } catch (error) {
-    return handleDbError(error, "删除标签");
-  }
-}
+export const DELETE = withDbError(
+  withAuth(
+    withValidation(
+      { params: paramsSchema },
+      async (req, { authUser, params }) => {
+        const { id } = params as { id: string };
+        const result = await tagService.remove(authUser!, id);
+        if (result instanceof Response) return result;
+        return successResponse(null, "删除成功");
+      }
+    )
+  )
+);
