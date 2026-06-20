@@ -1,6 +1,8 @@
 import { db } from "@/storage/database/drizzle-client";
-import { classes, studentClasses, students, teachers } from "@/storage/database/shared/schema";
+import { classes, studentClasses, students, teachers, users } from "@/storage/database/shared/schema";
 import { eq, inArray, or, isNull, and } from "drizzle-orm";
+import { comparePassword, hashPassword, isBcryptHash } from "@/lib/auth";
+import { apiError, notFoundError } from "@/lib/api-error";
 import type { AuthUserResult } from "@/lib/route-auth";
 
 export async function getTeacherClassIds(userId: string): Promise<string[]> {
@@ -74,4 +76,122 @@ export async function getAccessibleStudentIds(
     .where(inArray(studentClasses.classId, classIds));
 
   return [...new Set(rows.map((r) => r.studentId))];
+}
+
+export interface LoginInput {
+  username: string;
+  password: string;
+}
+
+export interface LoginResult {
+  user: {
+    id: string;
+    username: string;
+    name: string;
+    role: string;
+    phone: string | null;
+    teacherRole?: string | null;
+  };
+}
+
+export async function login(input: LoginInput): Promise<LoginResult | Response> {
+  const rows = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.username, input.username), eq(users.isActive, true)))
+    .limit(1);
+
+  const user = rows[0];
+  if (!user) return apiError("用户名或密码错误", 401, "INVALID_CREDENTIALS");
+
+  if (!isBcryptHash(user.password)) {
+    return apiError(
+      "密码格式已过期，请联系管理员重置密码",
+      401,
+      "PASSWORD_FORMAT_EXPIRED"
+    );
+  }
+
+  if (!(await comparePassword(input.password, user.password))) {
+    return apiError("用户名或密码错误", 401, "INVALID_CREDENTIALS");
+  }
+
+  const result: LoginResult["user"] = {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    phone: user.phone,
+  };
+
+  if (user.role === "teacher") {
+    const teacherRows = await db
+      .select({ role: teachers.role })
+      .from(teachers)
+      .where(eq(teachers.id, user.id))
+      .limit(1);
+    result.teacherRole = teacherRows[0]?.role ?? null;
+  }
+
+  return { user: result };
+}
+
+export async function getCurrentUser(userId: string): Promise<LoginResult["user"] | Response> {
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!user) return notFoundError("用户不存在");
+
+  const result: LoginResult["user"] = {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    phone: user.phone,
+  };
+
+  if (user.role === "teacher") {
+    const teacherRows = await db
+      .select({ role: teachers.role })
+      .from(teachers)
+      .where(eq(teachers.id, user.id))
+      .limit(1);
+    result.teacherRole = teacherRows[0]?.role ?? null;
+  }
+
+  return result;
+}
+
+export interface ChangePasswordInput {
+  oldPassword: string;
+  newPassword: string;
+}
+
+export async function changePassword(
+  userId: string,
+  input: ChangePasswordInput
+): Promise<{ success: true } | Response> {
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!user) return notFoundError("用户不存在");
+
+  if (!(await comparePassword(input.oldPassword, user.password))) {
+    return apiError("旧密码错误", 400, "INVALID_PASSWORD");
+  }
+
+  await db
+    .update(users)
+    .set({ password: await hashPassword(input.newPassword) })
+    .where(eq(users.id, user.id));
+
+  return { success: true };
 }
