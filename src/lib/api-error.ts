@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
 
 // 统一错误响应格式
-export function apiError(message: string, status: number = 500): NextResponse {
-  return errorResponse(message, status);
+export function apiError(message: string, status: number = 500, code?: string): NextResponse {
+  return errorResponse(message, status, code);
 }
 
 // 数据库错误处理 - 生产环境不暴露内部错误详情
@@ -45,4 +45,9 @@ export function forbiddenError(message: string = "权限不足"): NextResponse {
 // 资源未找到错误
 export function notFoundError(message: string = "资源未找到"): NextResponse {
   return apiError(message, 404);
+}
+
+// 请求参数错误
+export function badRequestError(message: string = "请求参数错误"): NextResponse {
+  return apiError(message, 400);
 }

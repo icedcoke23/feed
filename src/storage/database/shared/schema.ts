@@ -317,6 +317,8 @@ export const courseStages = pgTable(
   ]
 );
 
+export type CourseStage = typeof courseStages.$inferSelect;
+
 // 班级表
 export const classes = pgTable(
   "classes",
