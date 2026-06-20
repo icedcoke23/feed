@@ -33,9 +33,9 @@
 - 修改：`src/storage/database/shared/schema.ts`
 - 创建：`src/storage/database/migrations/0002_*.sql`（重新生成）
 
-- [ ] **步骤 1：读取当前 schema.ts 中所有表定义**
+- [x] **步骤 1：读取当前 schema.ts 中所有表定义**
 
-- [ ] **步骤 2：为以下字段补充 `.references()` 外键定义**
+- [x] **步骤 2：为以下字段补充 `.references()` 外键定义**
 
 ```ts
 // students
@@ -64,13 +64,15 @@ classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.
 stageCode: varchar("stage_code", { length: 50 }).notNull().references(() => courseStages.stageCode, { onDelete: "cascade" }),
 ```
 
-- [ ] **步骤 3：重新生成 Drizzle 迁移**
+- [x] **步骤 3：重新生成 Drizzle 迁移**
 
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/edu_db npx drizzle-kit generate
 ```
 
-- [ ] **步骤 4：提交**
+实际执行结果：`0000_equal_harpoon` 已包含全部 schema 变更，无需新增迁移。
+
+- [x] **步骤 4：提交**
 
 ```bash
 git add src/storage/database/shared/schema.ts src/storage/database/migrations/
@@ -84,7 +86,7 @@ git commit -m "feat(db): add foreign key constraints to schema and regenerate mi
 **文件：**
 - 创建：`scripts/migrate-add-foreign-keys.sql`
 
-- [ ] **步骤 1：创建脚本**
+- [x] **步骤 1：创建脚本**
 
 ```sql
 -- scripts/migrate-add-foreign-keys.sql
@@ -143,7 +145,7 @@ ALTER TABLE course_prompts
   ADD CONSTRAINT fk_course_prompts_stage FOREIGN KEY (stage_code) REFERENCES course_stages(stage_code) ON DELETE CASCADE;
 ```
 
-- [ ] **步骤 2：提交**
+- [x] **步骤 2：提交**
 
 ```bash
 git add scripts/migrate-add-foreign-keys.sql
@@ -157,7 +159,7 @@ git commit -m "feat(db): add foreign key constraints migration script"
 **文件：**
 - 创建：`scripts/migrate-add-indexes.sql`
 
-- [ ] **步骤 1：创建脚本**
+- [x] **步骤 1：创建脚本**
 
 ```sql
 -- scripts/migrate-add-indexes.sql
@@ -180,7 +182,7 @@ CREATE INDEX IF NOT EXISTS idx_feedbacks_metadata_gin ON feedbacks USING GIN (me
 CREATE INDEX IF NOT EXISTS idx_feedbacks_work_info_gin ON feedbacks USING GIN (work_info);
 ```
 
-- [ ] **步骤 2：提交**
+- [x] **步骤 2：提交**
 
 ```bash
 git add scripts/migrate-add-indexes.sql
@@ -194,7 +196,7 @@ git commit -m "feat(db): add composite, partial and GIN indexes"
 **文件：**
 - 创建：`scripts/migrate-updated-at-triggers.sql`
 
-- [ ] **步骤 1：创建脚本**
+- [x] **步骤 1：创建脚本**
 
 ```sql
 -- scripts/migrate-updated-at-triggers.sql
@@ -223,7 +225,7 @@ BEGIN
 END $$;
 ```
 
-- [ ] **步骤 2：提交**
+- [x] **步骤 2：提交**
 
 ```bash
 git add scripts/migrate-updated-at-triggers.sql
@@ -241,7 +243,7 @@ git commit -m "feat(db): add updated_at auto-update triggers"
 - 创建：`scripts/migrate-ai-settings.sql`
 - 创建：`src/storage/database/migrations/0003_*.sql`（重新生成）
 
-- [ ] **步骤 1：更新 schema.ts 中 aiSettings 表定义**
+- [x] **步骤 1：更新 schema.ts 中 aiSettings 表定义**
 
 ```ts
 export const aiSettings = pgTable(
@@ -262,7 +264,7 @@ export const aiSettings = pgTable(
 );
 ```
 
-- [ ] **步骤 2：更新 ai-client.ts 中 getAISettings 函数读取结构化字段**
+- [x] **步骤 2：更新 ai-client.ts 中 getAISettings 函数读取结构化字段**
 
 读取 `src/lib/ai-client.ts` 并替换 key-value 查询为结构化查询：
 
@@ -271,7 +273,7 @@ const rows = await db.select().from(aiSettings).limit(1);
 const data = rows[0];
 ```
 
-- [ ] **步骤 3：创建 SQL 迁移脚本**
+- [x] **步骤 3：创建 SQL 迁移脚本**
 
 ```sql
 -- scripts/migrate-ai-settings.sql
@@ -303,13 +305,15 @@ FROM ai_settings_old;
 DROP TABLE ai_settings_old;
 ```
 
-- [ ] **步骤 4：重新生成 Drizzle 迁移**
+- [x] **步骤 4：重新生成 Drizzle 迁移**
 
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/edu_db npx drizzle-kit generate
 ```
 
-- [ ] **步骤 5：提交**
+实际执行结果：`0000_equal_harpoon` 已包含 `ai_settings` 结构化表，无需新增迁移。
+
+- [x] **步骤 5：提交**
 
 ```bash
 git add src/storage/database/shared/schema.ts src/lib/ai-client.ts scripts/migrate-ai-settings.sql src/storage/database/migrations/
@@ -324,7 +328,7 @@ git commit -m "feat(db): restructure ai_settings to structured table and adapt a
 - 创建：`scripts/migrate-v1-to-v2.sql`
 - 创建：`scripts/rollback-v2-to-v1.sql`
 
-- [ ] **步骤 1：创建总迁移脚本**
+- [x] **步骤 1：创建总迁移脚本**
 
 ```sql
 -- scripts/migrate-v1-to-v2.sql
@@ -341,7 +345,7 @@ BEGIN;
 COMMIT;
 ```
 
-- [ ] **步骤 2：创建回滚脚本**
+- [x] **步骤 2：创建回滚脚本**
 
 ```sql
 -- scripts/rollback-v2-to-v1.sql
@@ -369,7 +373,7 @@ END $$;
 DROP FUNCTION IF EXISTS update_updated_at_column();
 ```
 
-- [ ] **步骤 3：提交**
+- [x] **步骤 3：提交**
 
 ```bash
 git add scripts/migrate-v1-to-v2.sql scripts/rollback-v2-to-v1.sql
@@ -383,24 +387,37 @@ git commit -m "feat(db): add full migration and rollback scripts"
 **文件：**
 - 按需修改
 
-- [ ] **步骤 1：运行类型检查**
+- [x] **步骤 1：运行类型检查**
 
 ```bash
 pnpm ts-check
 ```
 
-- [ ] **步骤 2：运行 ESLint**
+- [x] **步骤 2：运行 ESLint**
 
 ```bash
 pnpm lint
 ```
 
-- [ ] **步骤 3：修复错误（如有）并提交**
+- [x] **步骤 3：修复错误（如有）并提交**
 
 ```bash
 git add -A
 git commit -m "fix: resolve lint and type errors"
 ```
+
+---
+
+## 完成总结
+
+Phase 1 剩余任务已全部完成：
+- `schema.ts` 中外键约束、`feedback_items`、`feedback_ability_scores`、`student_classes`、`ai_settings` 结构化均已就位。
+- `relations.ts` 已补全新表关系。
+- `ai-client.ts` 已完成结构化 `ai_settings` 读取适配。
+- SQL 迁移脚本（外键、索引、触发器、ai_settings、总迁移、回滚）均已创建并提交。
+- Drizzle 迁移 `0000_equal_harpoon` 已包含全部 schema 变更，`drizzle-kit generate` 确认无需新增迁移。
+- 本地 `pnpm lint`（0 errors）与 `pnpm ts-check` 均通过。
+- 代码已推送至 `trae/solo-agent-Ecfafd` 分支。
 
 ---
 
