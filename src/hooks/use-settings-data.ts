@@ -1,36 +1,25 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import useSWR, { mutate as globalMutate } from "swr";
 import { toast } from "sonner";
 import type { CourseStage, Tag, Theme, AISettings, UserItem } from "@/types/settings";
 import { DEFAULT_COURSE_STAGES as DEFAULT_PRESETS } from "@/lib/constants/course-stages";
 import { getDefaultPrompt } from "@/lib/constants/ai";
 import type { ConfirmDialogState } from "@/components/business/confirm-dialog";
 import { INITIAL_CONFIRM_STATE, createConfirmState } from "@/components/business/confirm-dialog";
+import { fetcher, COURSE_STAGES_KEY, TAGS_KEY, THEMES_KEY, AI_SETTINGS_KEY, USERS_KEY } from "@/lib/swr";
+
+// ============ useCourseStages ============
 
 export function useCourseStages() {
-  const [courseStages, setCourseStages] = useState<CourseStage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: courseStages, isLoading: loading, mutate } = useSWR<CourseStage[]>(COURSE_STAGES_KEY, fetcher);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchCourseStages = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/course-stages", { credentials: "include" });
-      if (!response.ok) {
-        toast.error("获取课程阶段失败");
-        return;
-      }
-      const data = await response.json();
-      setCourseStages(data.data || []);
-    } catch (error) {
-      console.error("Failed to fetch course stages:", error);
-      toast.error("获取课程阶段失败");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    await mutate();
+  }, [mutate]);
 
   const saveCourseStage = useCallback(async (editingStage: Partial<CourseStage>, isAdding: boolean) => {
     void isAdding;
@@ -68,7 +57,7 @@ export function useCourseStages() {
 
       if (response.ok) {
         toast.success(isNew ? "添加成功" : "更新成功");
-        fetchCourseStages();
+        mutate();
         return true;
       } else {
         const error = await response.json();
@@ -82,7 +71,7 @@ export function useCourseStages() {
     } finally {
       setSaving(false);
     }
-  }, [fetchCourseStages]);
+  }, [mutate]);
 
   const deleteCourseStage = useCallback(async (id: string) => {
     setConfirmDialog(createConfirmState({
@@ -96,7 +85,7 @@ export function useCourseStages() {
           const response = await fetch(`/api/course-stages/${id}`, { method: "DELETE", credentials: "include" });
           if (response.ok) {
             toast.success("删除成功");
-            fetchCourseStages();
+            mutate();
           } else {
             toast.error("删除失败");
           }
@@ -105,7 +94,7 @@ export function useCourseStages() {
         }
       },
     }));
-  }, [fetchCourseStages]);
+  }, [mutate]);
 
   const addDefaultPresets = useCallback(async () => {
     setConfirmDialog(createConfirmState({
@@ -135,7 +124,7 @@ export function useCourseStages() {
             if (response.ok) successCount++;
           }
           toast.success(`成功添加 ${successCount} 个预设`);
-          fetchCourseStages();
+          mutate();
         } catch {
           toast.error("添加预设失败");
         } finally {
@@ -143,7 +132,7 @@ export function useCourseStages() {
         }
       },
     }));
-  }, [fetchCourseStages]);
+  }, [mutate]);
 
   const resetToPresets = useCallback(async () => {
     setConfirmDialog(createConfirmState({
@@ -164,7 +153,7 @@ export function useCourseStages() {
           if (response.ok) {
             const result = await response.json();
             toast.success(result.message || "重置成功");
-            fetchCourseStages();
+            mutate();
           } else {
             const error = await response.json();
             toast.error(error.error || "重置失败");
@@ -176,10 +165,10 @@ export function useCourseStages() {
         }
       },
     }));
-  }, [fetchCourseStages]);
+  }, [mutate]);
 
   return {
-    courseStages,
+    courseStages: courseStages || [],
     loading,
     saving,
     confirmDialog,
@@ -192,29 +181,16 @@ export function useCourseStages() {
   };
 }
 
+// ============ useTags ============
+
 export function useTags() {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(true);
+  const { data: tags, isLoading: tagsLoading, mutate } = useSWR<Tag[]>(TAGS_KEY, fetcher);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchTags = useCallback(async () => {
-    setTagsLoading(true);
-    try {
-      const response = await fetch("/api/tags", { credentials: "include" });
-      if (!response.ok) {
-        toast.error("获取标签失败");
-        return;
-      }
-      const data = await response.json();
-      setTags(data.data || []);
-    } catch (error) {
-      console.error("Failed to fetch tags:", error);
-      toast.error("获取标签失败");
-    } finally {
-      setTagsLoading(false);
-    }
-  }, []);
+    await mutate();
+  }, [mutate]);
 
   const saveTag = useCallback(async (editingTag: Partial<Tag>, isAddingTag: boolean) => {
     void isAddingTag;
@@ -253,7 +229,7 @@ export function useTags() {
 
       if (response.ok) {
         toast.success(isNew ? "添加成功" : "更新成功");
-        fetchTags();
+        mutate();
         return true;
       } else {
         const error = await response.json();
@@ -267,7 +243,7 @@ export function useTags() {
     } finally {
       setSaving(false);
     }
-  }, [fetchTags]);
+  }, [mutate]);
 
   const deleteTag = useCallback(async (id: string) => {
     setConfirmDialog(createConfirmState({
@@ -281,7 +257,7 @@ export function useTags() {
           const response = await fetch(`/api/tags/${id}`, { method: "DELETE", credentials: "include" });
           if (response.ok) {
             toast.success("删除成功");
-            fetchTags();
+            mutate();
           } else {
             toast.error("删除失败");
           }
@@ -290,10 +266,10 @@ export function useTags() {
         }
       },
     }));
-  }, [fetchTags]);
+  }, [mutate]);
 
   return {
-    tags,
+    tags: tags || [],
     tagsLoading,
     saving,
     confirmDialog,
@@ -304,29 +280,16 @@ export function useTags() {
   };
 }
 
+// ============ useThemes ============
+
 export function useThemes() {
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [themesLoading, setThemesLoading] = useState(true);
+  const { data: themes, isLoading: themesLoading, mutate } = useSWR<Theme[]>(THEMES_KEY, fetcher);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchThemes = useCallback(async () => {
-    setThemesLoading(true);
-    try {
-      const response = await fetch("/api/themes", { credentials: "include" });
-      if (!response.ok) {
-        toast.error("获取教学主题失败");
-        return;
-      }
-      const data = await response.json();
-      setThemes(data.data || []);
-    } catch (error) {
-      console.error("Failed to fetch themes:", error);
-      toast.error("获取教学主题失败");
-    } finally {
-      setThemesLoading(false);
-    }
-  }, []);
+    await mutate();
+  }, [mutate]);
 
   const saveTheme = useCallback(async (editingTheme: Partial<Theme>, isAddingTheme: boolean) => {
     void isAddingTheme;
@@ -365,7 +328,7 @@ export function useThemes() {
 
       if (response.ok) {
         toast.success(isNew ? "添加成功" : "更新成功");
-        fetchThemes();
+        mutate();
         return true;
       } else {
         const error = await response.json();
@@ -379,7 +342,7 @@ export function useThemes() {
     } finally {
       setSaving(false);
     }
-  }, [fetchThemes]);
+  }, [mutate]);
 
   const deleteTheme = useCallback(async (id: string) => {
     setConfirmDialog(createConfirmState({
@@ -393,7 +356,7 @@ export function useThemes() {
           const response = await fetch(`/api/themes/${id}`, { method: "DELETE", credentials: "include" });
           if (response.ok) {
             toast.success("删除成功");
-            fetchThemes();
+            mutate();
           } else {
             toast.error("删除失败");
           }
@@ -402,10 +365,10 @@ export function useThemes() {
         }
       },
     }));
-  }, [fetchThemes]);
+  }, [mutate]);
 
   return {
-    themes,
+    themes: themes || [],
     themesLoading,
     saving,
     confirmDialog,
@@ -416,45 +379,31 @@ export function useThemes() {
   };
 }
 
+// ============ useAISettings ============
+
 export function useAISettings() {
-  const [aiSettings, setAiSettings] = useState<AISettings>({
+  const { data: aiSettingsData, isLoading: aiSettingsLoading, mutate } = useSWR<AISettings>(AI_SETTINGS_KEY, fetcher);
+  const [saving, setSaving] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
+
+  const aiSettings = useMemo<AISettings>(() => aiSettingsData || {
     api_key: "",
     base_url: "",
     model_id: "",
     max_concurrent: "5",
     system_prompt: "",
     use_custom_ai: "false",
-  });
-  const [aiSettingsLoading, setAiSettingsLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [testingConnection, setTestingConnection] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
+  }, [aiSettingsData]);
+
+  const setAiSettings = useCallback((updater: AISettings | ((prev: AISettings) => AISettings)) => {
+    const next = typeof updater === "function" ? updater(aiSettings) : updater;
+    mutate(next, { revalidate: false });
+  }, [aiSettings, mutate]);
 
   const fetchAISettings = useCallback(async () => {
-    setAiSettingsLoading(true);
-    try {
-      const response = await fetch("/api/ai-settings", { credentials: "include" });
-      if (!response.ok) {
-        toast.error("获取AI设置失败");
-        return;
-      }
-      const data = await response.json();
-      const settings = data.data;
-      setAiSettings({
-        api_key: settings?.api_key || "",
-        base_url: settings?.base_url || "",
-        model_id: settings?.model_id || "",
-        max_concurrent: settings?.max_concurrent || "5",
-        system_prompt: settings?.system_prompt || "",
-        use_custom_ai: settings?.use_custom_ai || "false",
-      });
-    } catch (error) {
-      console.error("Failed to fetch AI settings:", error);
-      toast.error("获取AI设置失败");
-    } finally {
-      setAiSettingsLoading(false);
-    }
-  }, []);
+    await mutate();
+  }, [mutate]);
 
   const saveAISettings = useCallback(async () => {
     setSaving(true);
@@ -468,6 +417,7 @@ export function useAISettings() {
 
       if (response.ok) {
         toast.success("AI设置保存成功");
+        mutate();
       } else {
         toast.error("保存失败");
       }
@@ -477,7 +427,7 @@ export function useAISettings() {
     } finally {
       setSaving(false);
     }
-  }, [aiSettings]);
+  }, [aiSettings, mutate]);
 
   const testConnection = useCallback(async () => {
     setTestingConnection(true);
@@ -547,7 +497,7 @@ export function useAISettings() {
           const defaultPrompt = getDefaultPrompt();
 
           // 更新本地 state
-          setAiSettings((prev) => ({
+          setAiSettings((prev: AISettings) => ({
             ...prev,
             system_prompt: defaultPrompt,
           }));
@@ -562,6 +512,7 @@ export function useAISettings() {
 
           if (response.ok) {
             toast.success("提示词已重置为默认值");
+            mutate();
           } else {
             toast.error("重置提示词失败，保存到数据库时出错");
           }
@@ -571,7 +522,7 @@ export function useAISettings() {
         }
       },
     }));
-  }, []);
+  }, [setAiSettings, mutate]);
 
   return {
     aiSettings,
@@ -588,29 +539,16 @@ export function useAISettings() {
   };
 }
 
+// ============ useUsers ============
+
 export function useUsers() {
-  const [users, setUsers] = useState<UserItem[]>([]);
-  const [usersLoading, setUsersLoading] = useState(true);
+  const { data: users, isLoading: usersLoading, mutate } = useSWR<UserItem[]>(USERS_KEY, fetcher);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchUsers = useCallback(async () => {
-    setUsersLoading(true);
-    try {
-      const response = await fetch("/api/users", { credentials: "include" });
-      if (!response.ok) {
-        toast.error("获取用户列表失败");
-        return;
-      }
-      const data = await response.json();
-      setUsers(data.data || []);
-    } catch (error) {
-      console.error("Failed to fetch users:", error);
-      toast.error("获取用户列表失败");
-    } finally {
-      setUsersLoading(false);
-    }
-  }, []);
+    await mutate();
+  }, [mutate]);
 
   const saveUser = useCallback(async (editingUser: Partial<UserItem>, isAddingUser: boolean) => {
     if (!editingUser.username || !editingUser.name) {
@@ -655,7 +593,7 @@ export function useUsers() {
 
       if (response.ok) {
         toast.success(isNew ? "添加成功" : "更新成功");
-        fetchUsers();
+        mutate();
         return true;
       } else {
         const error = await response.json();
@@ -669,7 +607,7 @@ export function useUsers() {
     } finally {
       setSaving(false);
     }
-  }, [fetchUsers]);
+  }, [mutate]);
 
   const deleteUser = useCallback(async (id: string) => {
     setConfirmDialog(createConfirmState({
@@ -683,7 +621,7 @@ export function useUsers() {
           const response = await fetch(`/api/users/${id}`, { method: "DELETE", credentials: "include" });
           if (response.ok) {
             toast.success("删除成功");
-            fetchUsers();
+            mutate();
           } else {
             const error = await response.json();
             toast.error(error.error || "删除失败");
@@ -693,10 +631,10 @@ export function useUsers() {
         }
       },
     }));
-  }, [fetchUsers]);
+  }, [mutate]);
 
   return {
-    users,
+    users: users || [],
     usersLoading,
     saving,
     confirmDialog,
@@ -706,3 +644,6 @@ export function useUsers() {
     deleteUser,
   };
 }
+
+// Re-export for consumers using globalMutate
+export { globalMutate };
