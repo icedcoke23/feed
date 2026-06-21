@@ -9,8 +9,10 @@ import {
   classTransfers,
   teachers,
   users,
+  aiSettings,
+  coursePrompts,
 } from "@/storage/database/shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import * as dataRepo from "@/lib/repositories/data-repository";
 import { hashPassword } from "@/lib/auth";
 import type { Database } from "@/storage/database/types";
@@ -193,6 +195,178 @@ function generateRandomPassword(length = 16): string {
     password += chars[array[i] % chars.length];
   }
   return password;
+}
+
+export interface BackupData {
+  version: string;
+  backupAt: string;
+  appVersion?: string;
+  counts: Record<string, number>;
+  users: (typeof users.$inferSelect)[];
+  teachers: (typeof teachers.$inferSelect)[];
+  students: (typeof students.$inferSelect)[];
+  classes: (typeof classes.$inferSelect)[];
+  feedbacks: (typeof feedbacks.$inferSelect)[];
+  classTransfers: (typeof classTransfers.$inferSelect)[];
+  themes: (typeof teachingThemes.$inferSelect)[];
+  tags: (typeof tags.$inferSelect)[];
+  courseStages: (typeof courseStages.$inferSelect)[];
+  aiSettings: (typeof aiSettings.$inferSelect)[];
+  coursePrompts: (typeof coursePrompts.$inferSelect)[];
+}
+
+/**
+ * 备份所有数据：业务数据、账号数据和配置数据。
+ */
+export async function backupAll(): Promise<BackupData> {
+  const [
+    usersData,
+    teachersData,
+    studentsData,
+    classesData,
+    feedbacksData,
+    classTransfersData,
+    themesData,
+    tagsData,
+    courseStagesData,
+    aiSettingsData,
+    coursePromptsData,
+  ] = await Promise.all([
+    db.select().from(users),
+    db.select().from(teachers),
+    db.select().from(students),
+    db.select().from(classes),
+    db.select().from(feedbacks),
+    db.select().from(classTransfers),
+    db.select().from(teachingThemes),
+    db.select().from(tags),
+    db.select().from(courseStages),
+    db.select().from(aiSettings),
+    db.select().from(coursePrompts),
+  ]);
+
+  const counts = {
+    users: usersData.length,
+    teachers: teachersData.length,
+    students: studentsData.length,
+    classes: classesData.length,
+    feedbacks: feedbacksData.length,
+    classTransfers: classTransfersData.length,
+    themes: themesData.length,
+    tags: tagsData.length,
+    courseStages: courseStagesData.length,
+    aiSettings: aiSettingsData.length,
+    coursePrompts: coursePromptsData.length,
+  };
+
+  return {
+    version: "1.0",
+    backupAt: new Date().toISOString(),
+    appVersion: process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0",
+    counts,
+    users: usersData,
+    teachers: teachersData,
+    students: studentsData,
+    classes: classesData,
+    feedbacks: feedbacksData,
+    classTransfers: classTransfersData,
+    themes: themesData,
+    tags: tagsData,
+    courseStages: courseStagesData,
+    aiSettings: aiSettingsData,
+    coursePrompts: coursePromptsData,
+  };
+}
+
+export type RestoreSelection =
+  | "users"
+  | "teachers"
+  | "classes"
+  | "students"
+  | "classTransfers"
+  | "feedbacks"
+  | "themes"
+  | "tags"
+  | "courseStages"
+  | "aiSettings"
+  | "coursePrompts";
+
+interface RestoreTableConfig<T extends Record<string, unknown>> {
+  key: RestoreSelection;
+  table:
+    | typeof users
+    | typeof teachers
+    | typeof classes
+    | typeof students
+    | typeof classTransfers
+    | typeof feedbacks
+    | typeof teachingThemes
+    | typeof tags
+    | typeof courseStages
+    | typeof aiSettings
+    | typeof coursePrompts;
+  data: T[];
+}
+
+/**
+ * 按选择项从备份中恢复数据。
+ * 所有写入在同一个事务中执行，失败整体回滚。
+ * 同 ID 数据会覆盖现有记录。
+ */
+export async function restoreData(
+  backup: BackupData,
+  selections: RestoreSelection[]
+): Promise<{ results: Record<string, { success: number; failed: number }>; logs: string[] }> {
+  const results: Record<string, { success: number; failed: number }> = {};
+  const logs: string[] = [];
+
+  const selected = new Set(selections);
+
+  const configs: RestoreTableConfig<Record<string, unknown>>[] = [
+    { key: "users", table: users, data: backup.users as Record<string, unknown>[] },
+    { key: "teachers", table: teachers, data: backup.teachers as Record<string, unknown>[] },
+    { key: "classes", table: classes, data: backup.classes as Record<string, unknown>[] },
+    { key: "students", table: students, data: backup.students as Record<string, unknown>[] },
+    { key: "classTransfers", table: classTransfers, data: backup.classTransfers as Record<string, unknown>[] },
+    { key: "feedbacks", table: feedbacks, data: backup.feedbacks as Record<string, unknown>[] },
+    { key: "themes", table: teachingThemes, data: backup.themes as Record<string, unknown>[] },
+    { key: "tags", table: tags, data: backup.tags as Record<string, unknown>[] },
+    { key: "courseStages", table: courseStages, data: backup.courseStages as Record<string, unknown>[] },
+    { key: "aiSettings", table: aiSettings, data: backup.aiSettings as Record<string, unknown>[] },
+    { key: "coursePrompts", table: coursePrompts, data: backup.coursePrompts as Record<string, unknown>[] },
+  ];
+
+  await withTransaction(async (tx: Database) => {
+    for (const config of configs) {
+      if (!selected.has(config.key)) {
+        logs.push(`跳过 ${config.key}`);
+        continue;
+      }
+
+      const count = config.data.length;
+      if (count === 0) {
+        results[config.key] = { success: 0, failed: 0 };
+        logs.push(`${config.key}: 无数据`);
+        continue;
+      }
+
+      try {
+        const ids = config.data.map((item) => item.id).filter((id): id is string => typeof id === "string");
+        if (ids.length > 0) {
+          await tx.delete(config.table).where(inArray((config.table as unknown as { id: typeof users.id }).id, ids));
+        }
+        await tx.insert(config.table).values(config.data as never[]);
+        results[config.key] = { success: count, failed: 0 };
+        logs.push(`${config.key}: 成功恢复 ${count} 条`);
+      } catch (error) {
+        results[config.key] = { success: 0, failed: count };
+        logs.push(`${config.key}: 恢复失败 ${count} 条`);
+        throw error;
+      }
+    }
+  });
+
+  return { results, logs };
 }
 
 /**

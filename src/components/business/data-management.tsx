@@ -25,6 +25,8 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/business/confirm-dialog";
 import type { ConfirmDialogState } from "@/components/business/confirm-dialog";
 import { INITIAL_CONFIRM_STATE, createConfirmState } from "@/components/business/confirm-dialog";
+import { BackupRestoreDialog } from "@/components/business/backup-restore-dialog";
+import type { BackupData, RestoreSelection } from "@/lib/services/data-service";
 
 interface DataManagerProps {
   onDataChanged: () => void;
@@ -36,7 +38,12 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [backupFile, setBackupFile] = useState<File | null>(null);
+  const [backupData, setBackupData] = useState<BackupData | null>(null);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [importMode, setImportMode] = useState<"overwrite" | "incremental">("incremental");
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
@@ -212,6 +219,87 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
     }));
   };
 
+  const handleBackupData = async () => {
+    setIsBackingUp(true);
+    try {
+      const response = await fetch("/api/data/backup", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        toast.error("备份失败，请重试");
+        return;
+      }
+
+      const blob = await response.blob();
+      const filename = response.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1]
+        || `teaching-feedback-backup-${new Date().toISOString().split("T")[0]}.json`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("数据备份成功");
+    } catch (error) {
+      console.error("Backup error:", error);
+      toast.error("备份失败，请重试");
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleParseBackupFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as BackupData;
+      if (!data.version || !data.backupAt || !data.counts) {
+        toast.error("无效的备份文件格式");
+        setBackupData(null);
+        return;
+      }
+      setBackupData(data);
+      setRestoreDialogOpen(true);
+    } catch (error) {
+      console.error("Parse backup error:", error);
+      toast.error("备份文件解析失败，请检查文件格式");
+      setBackupData(null);
+    }
+  };
+
+  const handleRestoreFromBackup = async (selections: RestoreSelection[]) => {
+    if (!backupData) return;
+    setIsRestoring(true);
+    try {
+      const response = await fetch("/api/data/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: backupData, selections }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        toast.error(result.error || "恢复失败，请重试");
+        return;
+      }
+
+      const result = await response.json();
+      toast.success(`数据恢复完成：${result.message}`);
+      setBackupFile(null);
+      setBackupData(null);
+      onDataChanged();
+    } catch (error) {
+      console.error("Restore error:", error);
+      toast.error("恢复失败，请重试");
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -244,6 +332,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
                 onClick={handleExportData}
                 disabled={isExporting}
                 className="ml-4"
+                variant="outline"
               >
                 {isExporting ? (
                   <>
@@ -257,6 +346,88 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
                   </>
                 )}
               </Button>
+            </div>
+          </div>
+
+          {/* 一键备份 */}
+          <div className="border rounded-lg p-4 border-blue-200 bg-blue-50/30">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="font-medium flex items-center gap-2 text-blue-700">
+                  <Database className="h-4 w-4" />
+                  一键备份
+                </h3>
+                <p className="text-sm text-blue-600 mt-1">
+                  打包所有业务数据、用户账号和配置数据为 JSON 文件
+                </p>
+                <p className="text-xs text-blue-500 mt-2">
+                  包含学员、班级、反馈、教师账号、AI 设置等全部数据
+                </p>
+              </div>
+              <Button
+                onClick={handleBackupData}
+                disabled={isBackingUp}
+                className="ml-4"
+              >
+                {isBackingUp ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    备份中...
+                  </>
+                ) : (
+                  <>
+                    <Database className="h-4 w-4 mr-2" />
+                    创建备份
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* 选择性恢复 */}
+          <div className="border rounded-lg p-4 border-purple-200 bg-purple-50/30">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="font-medium flex items-center gap-2 text-purple-700">
+                  <Upload className="h-4 w-4" />
+                  选择性恢复
+                </h3>
+                <p className="text-sm text-purple-600 mt-1">
+                  从备份文件中选择部分数据分类进行恢复
+                </p>
+                <p className="text-xs text-purple-500 mt-2">
+                  恢复前建议先备份当前数据。同 ID 的数据将被覆盖。
+                </p>
+              </div>
+              <div className="flex items-center gap-2 ml-4">
+                <Input
+                  type="file"
+                  accept=".json"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setBackupFile(file);
+                    if (file) handleParseBackupFile(file);
+                  }}
+                  className="w-48"
+                />
+                <Button
+                  onClick={() => backupFile && handleParseBackupFile(backupFile)}
+                  disabled={isRestoring || !backupFile}
+                  variant="outline"
+                >
+                  {isRestoring ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      恢复中...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      选择恢复
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -401,6 +572,16 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
         confirmText={confirmDialog.confirmText}
         variant={confirmDialog.variant}
         onConfirm={confirmDialog.onConfirm}
+      />
+
+      <BackupRestoreDialog
+        open={restoreDialogOpen}
+        onOpenChange={(open) => {
+          setRestoreDialogOpen(open);
+          if (!open) setBackupFile(null);
+        }}
+        backupData={backupData}
+        onRestore={handleRestoreFromBackup}
       />
     </div>
   );
