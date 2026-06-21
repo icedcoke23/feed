@@ -3,6 +3,7 @@ import { forbiddenError, badRequestError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { batchImportClassSchema } from "@/lib/validations/data-import";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import * as batchImportService from "@/lib/services/batch-import-service";
 
 // POST /api/batch-import/classes - 批量导入班级
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     return successResponse(result);
   } catch (error) {
-    console.error("Batch import error:", error);
+    console.error("Batch import error:", sanitizeError(error));
     return errorResponse("导入失败", 500);
   }
 }

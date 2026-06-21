@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./shared/schema";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import type { Database } from "./types";
 
 /**
@@ -22,7 +23,7 @@ const pool = new Pool({
 
 // 连接池错误处理（防止进程崩溃）
 pool.on("error", (err) => {
-  console.error("[DB] Unexpected error on idle client:", err);
+  console.error("[DB] Unexpected error on idle client:", sanitizeError(err));
 });
 
 // 开发环境连接日志

@@ -27,6 +27,7 @@ import type { ConfirmDialogState } from "@/components/business/confirm-dialog";
 import { INITIAL_CONFIRM_STATE, createConfirmState } from "@/components/business/confirm-dialog";
 import { BackupRestoreDialog } from "@/components/business/backup-restore-dialog";
 import type { BackupData, RestoreSelection } from "@/lib/services/data-service";
+import { sanitizeError } from "@/lib/sensitive-mask";
 
 interface DataManagerProps {
   onDataChanged: () => void;
@@ -69,7 +70,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
 
       toast.success("数据导出成功");
     } catch (error) {
-      console.error("Export error:", error);
+      console.error("Export error:", sanitizeError(error));
       toast.error("导出失败，请重试");
     } finally {
       setIsExporting(false);
@@ -118,7 +119,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
             toast.error(result.error || "导入失败");
           }
         } catch (error) {
-          console.error("Import error:", error);
+          console.error("Import error:", sanitizeError(error));
           toast.error("导入失败，请检查文件格式");
         } finally {
           setIsImporting(false);
@@ -163,7 +164,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
                 toast.error(result.error || "清空失败");
               }
             } catch (error) {
-              console.error("Clear error:", error);
+              console.error("Clear error:", sanitizeError(error));
               toast.error("清空失败，请重试");
             } finally {
               setIsClearing(false);
@@ -208,7 +209,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
                 toast.error(result.error || "重置失败");
               }
             } catch (error) {
-              console.error("Reset error:", error);
+              console.error("Reset error:", sanitizeError(error));
               toast.error("重置失败，请重试");
             } finally {
               setIsResetting(false);
@@ -246,7 +247,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
 
       toast.success("数据备份成功");
     } catch (error) {
-      console.error("Backup error:", error);
+      console.error("Backup error:", sanitizeError(error));
       toast.error("备份失败，请重试");
     } finally {
       setIsBackingUp(false);
@@ -265,7 +266,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
       setBackupData(data);
       setRestoreDialogOpen(true);
     } catch (error) {
-      console.error("Parse backup error:", error);
+      console.error("Parse backup error:", sanitizeError(error));
       toast.error("备份文件解析失败，请检查文件格式");
       setBackupData(null);
     }
@@ -293,7 +294,7 @@ export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
       setBackupData(null);
       onDataChanged();
     } catch (error) {
-      console.error("Restore error:", error);
+      console.error("Restore error:", sanitizeError(error));
       toast.error("恢复失败，请重试");
     } finally {
       setIsRestoring(false);

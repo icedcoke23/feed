@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validateInput } from "@/lib/validations";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import * as studentService from "@/lib/services/student-service";
 
 const studentItemSchema = z.object({
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     return successResponse(data.data, `成功添加 ${data.count} 名学员`);
   } catch (error) {
-    console.error("Batch add students error:", error);
+    console.error("Batch add students error:", sanitizeError(error));
     return errorResponse("批量添加失败", 500);
   }
 }

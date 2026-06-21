@@ -1,4 +1,5 @@
 import * as coursePromptRepo from "@/lib/repositories/course-prompt-repository";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import type { CoursePrompt } from "@/storage/database/shared/schema";
 
 /**
@@ -12,7 +13,7 @@ export async function getCoursePromptByStageCode(
   try {
     return await coursePromptRepo.findByStageCode(stageCode);
   } catch (error) {
-    console.error("[getCoursePromptByStageCode] 查询失败:", error);
+    console.error("[getCoursePromptByStageCode] 查询失败:", sanitizeError(error));
     return null;
   }
 }

@@ -44,3 +44,21 @@ export function sanitizeErrorMessage(message: string): string {
     .replace(/https?:\/\/[^\s]+/gi, "[URL已隐藏]")
     .replace(/sk-[a-zA-Z0-9]{8,}/g, "[KEY已隐藏]");
 }
+
+/** 通用错误脱敏：支持 Error / string / object */
+export function sanitizeError(error: unknown): string {
+  if (error instanceof Error) {
+    return sanitizeErrorMessage(error.message);
+  }
+  if (typeof error === "string") {
+    return sanitizeErrorMessage(error);
+  }
+  if (error && typeof error === "object") {
+    try {
+      return sanitizeErrorMessage(JSON.stringify(error));
+    } catch {
+      return "[无法序列化的错误对象]";
+    }
+  }
+  return "[未知错误]";
+}

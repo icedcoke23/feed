@@ -3,6 +3,7 @@ import { handleDbError, badRequestError } from "@/lib/api-error";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { getAuthUser } from "@/lib/route-auth";
 import { initDataSchema } from "@/lib/validations/data-import";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import * as initDataService from "@/lib/services/init-data-service";
 
 // POST /api/init-data - 初始化预设数据
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       "初始化成功"
     );
   } catch (error) {
-    console.error("Init error:", error);
+    console.error("Init error:", sanitizeError(error));
     return handleDbError(error, "初始化数据");
   }
 }

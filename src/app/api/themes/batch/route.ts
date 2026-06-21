@@ -4,6 +4,7 @@ import { validateInput } from "@/lib/validations";
 import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import * as themeService from "@/lib/services/theme-service";
 import type { TeachingTheme } from "@/storage/database/shared/schema";
 
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     return successResponse(data.map(toThemeResponse), `成功添加 ${data.length} 个主题`);
   } catch (error) {
-    console.error("Batch add themes error:", error);
+    console.error("Batch add themes error:", sanitizeError(error));
     return handleDbError(error, "批量添加主题");
   }
 }

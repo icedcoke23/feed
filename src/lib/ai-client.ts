@@ -1,6 +1,7 @@
 import { db } from "@/storage/database/drizzle-client";
 import { aiSettings } from "@/storage/database/shared/schema";
 import { DEFAULT_COZE_MODEL, getDefaultPrompt } from "@/lib/constants/ai";
+import { sanitizeError } from "@/lib/sensitive-mask";
 
 // AI 设置类型
 export interface AISettings {
@@ -31,7 +32,7 @@ export async function getAISettings(): Promise<AISettings | null> {
       useCustomAI: data.useCustomAi ?? false,
     };
   } catch (error) {
-    console.error("Failed to get AI settings:", error);
+    console.error("Failed to get AI settings:", sanitizeError(error));
     return null;
   }
 }
@@ -173,7 +174,7 @@ export async function streamThirdPartyAI(
     });
   } catch (error) {
     clearTimeout(timeoutId);
-    console.error("Third-party AI error:", error);
+    console.error("Third-party AI error:", sanitizeError(error));
     // 脱敏：移除错误消息中可能包含的 URL 和 API key
     const rawMessage = error instanceof Error ? error.message : "未知错误";
     const sanitizedMessage = rawMessage

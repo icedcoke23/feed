@@ -5,6 +5,7 @@ import * as generateService from "@/lib/services/generate-service";
 import { getAuthUser } from "@/lib/route-auth";
 import { errorResponse } from "@/lib/api-response";
 import { unauthorizedError } from "@/lib/api-error";
+import { sanitizeError } from "@/lib/sensitive-mask";
 
 const reviewSchema = z.object({
   studentName: z.string().max(50).optional(),
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     return await generateService.reviewFeedback(result.data);
   } catch (error) {
-    console.error("Review error:", error);
+    console.error("Review error:", sanitizeError(error));
     const rawMessage = error instanceof Error ? error.message : "未知错误";
     const sanitizedMessage = rawMessage
       .replace(/https?:\/\/[^\s]+/gi, "[URL]")

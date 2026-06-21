@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { getAdminTeacherMappings } from "@/lib/config/default-admins";
 import { updateAdminTeacherSchema } from "@/lib/validations/data-import";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import * as batchImportService from "@/lib/services/batch-import-service";
 
 // POST /api/batch-import/update-admin-teacher - 批量更新学员教务老师
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
       ...result,
     });
   } catch (error) {
-    console.error("Update admin teacher error:", error);
+    console.error("Update admin teacher error:", sanitizeError(error));
     return errorResponse("更新失败", 500);
   }
 }

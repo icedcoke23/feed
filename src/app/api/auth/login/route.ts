@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth";
 import { validateInput } from "@/lib/validations";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Login error:", sanitizeError(error));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

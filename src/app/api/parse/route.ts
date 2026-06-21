@@ -7,6 +7,7 @@ import http from "http";
 import { isSafeUrlAsync } from "@/lib/ssrf-guard";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { sanitizeError } from "@/lib/sensitive-mask";
 
 const parseSchema = z.object({
   content: z.string().min(1).max(10000),
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
 
     return successResponse(parsedData);
   } catch (error) {
-    console.error("Parse error:", error);
+    console.error("Parse error:", sanitizeError(error));
     return errorResponse("解析失败，请检查输入格式", 500);
   }
 }

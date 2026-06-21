@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { sanitizeError } from "@/lib/sensitive-mask";
 import * as studentService from "@/lib/services/student-service";
 
 // GET /api/students/[id]/history - 获取学员历史反馈
@@ -22,7 +23,7 @@ export async function GET(
     }
     return successResponse(result);
   } catch (error) {
-    console.error("Failed to fetch history:", error);
+    console.error("Failed to fetch history:", sanitizeError(error));
     return successResponse([]);
   }
 }
