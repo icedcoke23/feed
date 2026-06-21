@@ -15,6 +15,7 @@ import type {
 } from "@/types/feedback";
 import { useDraftSave } from "@/hooks/use-draft-save";
 import { useFeedbackRestore } from "@/hooks/use-feedback-restore";
+import { loadTempReportFromSession, clearTempReport } from "@/lib/pdf-session";
 
 interface UseFeedbackFormOptions {
   tags: TagItem[];
@@ -137,45 +138,40 @@ export function useFeedbackForm({ tags, setTags, students, teachers, adminTeache
   useEffect(() => {
     const step = searchParams.get("step");
     if (step === "4") {
-      try {
-        const tempData = sessionStorage.getItem("tempReportData");
-        if (tempData) {
-          const report = JSON.parse(tempData);
-          if (report.strengths || report.improvements || report.recommendations || report.summary) {
-            setGeneratedReport({
-              strengths: report.strengths || "",
-              improvements: report.improvements || "",
-              weaknesses: report.weaknesses || "",
-              recommendations: report.recommendations || "",
-              summary: report.summary || "",
-            });
-          }
-          if (report.tagRatings && Array.isArray(report.tagRatings)) {
-            const ratings: Record<string, TagRating> = {};
-            report.tagRatings.forEach((tag: { name: string; rating: number; note: string }) => {
-              const isCustom = !tags.some((t) => t.name === tag.name);
-              const tagId = isCustom
-                ? `custom-${tag.name}`
-                : tags.find((t) => t.name === tag.name)?.id;
-              if (tagId) {
-                ratings[tagId] = { rating: tag.rating, note: tag.note, isCustom };
-              }
-            });
-            setTagRatings(ratings);
-          }
-          if (report.hasCoursePlan !== undefined) {
-            setHasCoursePlan(report.hasCoursePlan);
-          }
-          if (report.coursePlans && Array.isArray(report.coursePlans)) {
-            setCoursePlans(report.coursePlans);
-          }
-          if (report.studentId) {
-            setSelectedStudentId(report.studentId);
-          }
-          sessionStorage.removeItem("tempReportData");
+      const report = loadTempReportFromSession();
+      if (report) {
+        if (report.strengths || report.improvements || report.recommendations || report.summary) {
+          setGeneratedReport({
+            strengths: report.strengths || "",
+            improvements: report.improvements || "",
+            weaknesses: report.weaknesses || "",
+            recommendations: report.recommendations || "",
+            summary: report.summary || "",
+          });
         }
-      } catch (e) {
-        console.error("Failed to restore temp report data:", e);
+        if (report.tagRatings && Array.isArray(report.tagRatings)) {
+          const ratings: Record<string, TagRating> = {};
+          report.tagRatings.forEach((tag: { name: string; rating: number; note: string }) => {
+            const isCustom = !tags.some((t) => t.name === tag.name);
+            const tagId = isCustom
+              ? `custom-${tag.name}`
+              : tags.find((t) => t.name === tag.name)?.id;
+            if (tagId) {
+              ratings[tagId] = { rating: tag.rating, note: tag.note, isCustom };
+            }
+          });
+          setTagRatings(ratings);
+        }
+        if (report.hasCoursePlan !== undefined) {
+          setHasCoursePlan(report.hasCoursePlan);
+        }
+        if (report.coursePlans && Array.isArray(report.coursePlans)) {
+          setCoursePlans(report.coursePlans);
+        }
+        if (report.studentId) {
+          setSelectedStudentId(report.studentId);
+        }
+        clearTempReport(true);
       }
     }
   }, [searchParams, tags, setGeneratedReport, setTagRatings, setHasCoursePlan, setCoursePlans, setSelectedStudentId]);

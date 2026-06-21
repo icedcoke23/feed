@@ -11,6 +11,7 @@ import type {
   StudentPhoto,
   GeneratedReport,
 } from "@/types/feedback";
+import { savePdfReportData } from "@/lib/pdf-session";
 
 interface UseExportOptions {
   students: FeedbackStudent[];
@@ -129,7 +130,7 @@ export function useExport({
     }
 
     try {
-      localStorage.setItem("pdfReportData", dataString);
+      savePdfReportData(reportData);
     } catch (e) {
       console.error("localStorage存储失败:", e);
       toast.error("数据量过大，请减少照片数量后重试");
