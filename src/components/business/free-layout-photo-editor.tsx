@@ -92,6 +92,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
     };
     updateLayouts();
     return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photos]);
 
   // 初始化布局：读取每张图片的实际宽高比
@@ -153,7 +154,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
       }, 0);
     };
     initLayouts();
-  }, [currentPhotoIds, prevPhotoIds]);
+  }, [currentPhotoIds, prevPhotoIds, photos]);
 
   // 重试机制：首次计算时容器宽度可能为 0，延迟重新计算
   useEffect(() => {
@@ -275,24 +276,27 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
                   图片加载失败
                 </div>
               ) : (
-              <img
-                src={layout.url}
-                alt="学员照片"
-                loading="eager"
-                onLoad={() => console.log('[Photo] loaded:', layout.id)}
-                onError={() => {
-                  console.error('[Photo] load failed:', layout.id, layout.url);
-                  setFailedImageIds(prev => new Set(prev).add(layout.id));
-                }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  display: 'block',
-                  pointerEvents: 'none',
-                  backgroundColor: '#f5f5f5',
-                }}
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={layout.url}
+                  alt="学员照片"
+                  loading="eager"
+                  onLoad={() => console.log('[Photo] loaded:', layout.id)}
+                  onError={() => {
+                    console.error('[Photo] load failed:', layout.id, layout.url);
+                    setFailedImageIds(prev => new Set(prev).add(layout.id));
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                    pointerEvents: 'none',
+                    backgroundColor: '#f5f5f5',
+                  }}
+                />
+              </>
               )}
 
               {/* hover 操作按钮 */}

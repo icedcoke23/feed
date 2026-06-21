@@ -114,7 +114,7 @@ export default function SettingsClient() {
       case "users":
         return user?.role === "admin" ? <UsersTab currentUserId={user?.id} /> : null;
       case "data":
-        return user?.role === "admin" ? <DataTab userRole={user?.role} /> : null;
+        return user?.role === "admin" ? <DataTab /> : null;
       default:
         return null;
     }

@@ -10,11 +10,7 @@ import {
   USERS_KEY,
 } from "@/lib/swr";
 
-interface DataTabProps {
-  userRole?: string;
-}
-
-export function DataTab({ userRole }: DataTabProps) {
+export function DataTab() {
   const handleDataChanged = () => {
     globalMutate(COURSE_STAGES_KEY);
     globalMutate(TAGS_KEY);
@@ -23,5 +19,5 @@ export function DataTab({ userRole }: DataTabProps) {
     globalMutate(USERS_KEY);
   };
 
-  return <DataManager onDataChanged={handleDataChanged} userRole={userRole} />;
+  return <DataManager onDataChanged={handleDataChanged} />;
 }

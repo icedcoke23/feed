@@ -41,12 +41,6 @@ const TAG_CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: strin
   weakness: AlertCircle,
 };
 
-const TAG_CATEGORY_COLORS: Record<string, string> = {
-  green: "bg-green-100 text-green-700",
-  blue: "bg-blue-100 text-blue-700",
-  red: "bg-red-100 text-red-700",
-};
-
 interface TagManagementProps {
   tags: TagType[];
   loading: boolean;
@@ -86,19 +80,6 @@ export function TagManagement({
     if (success) {
       setIsEditDialogOpen(false);
     }
-  };
-
-  const getTagCategoryBadge = (category: string) => {
-    const option = TAG_CATEGORY_OPTIONS.find(o => o.value === category);
-    if (!option) return <Badge>{category}</Badge>;
-
-    const Icon = TAG_CATEGORY_ICONS[category] || CheckCircle2;
-    return (
-      <Badge className={TAG_CATEGORY_COLORS[option.color]}>
-        <Icon className="h-3 w-3 mr-1" />
-        {option.label}
-      </Badge>
-    );
   };
 
   const groupedTags = tags.reduce((acc, tag) => {

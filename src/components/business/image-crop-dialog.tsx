@@ -291,6 +291,37 @@ export function ImageCropDialog({
     }
   }, [open, imageSrc, defaultAspect]);
 
+  // 自由裁剪：计算像素区域
+  const getFreeCropPixels = useCallback((): Area | null => {
+    if (!freeImageSize) return null;
+    // 旋转 90/270 度时宽高互换
+    const isRotated90or270 = rotation === 90 || rotation === 270;
+    const imgW = isRotated90or270 ? freeImageSize.h : freeImageSize.w;
+    const imgH = isRotated90or270 ? freeImageSize.w : freeImageSize.h;
+    return {
+      x: Math.round(freeCropRect.x * imgW),
+      y: Math.round(freeCropRect.y * imgH),
+      width: Math.round(freeCropRect.width * imgW),
+      height: Math.round(freeCropRect.height * imgH),
+    };
+  }, [freeCropRect, freeImageSize, rotation]);
+
+  const handleConfirm = useCallback(async () => {
+    const pixelArea = isFreeCrop ? getFreeCropPixels() : croppedAreaPixels;
+    if (!pixelArea) return;
+    setCropping(true);
+    try {
+      const croppedDataUrl = await getCroppedImg(imageSrc, pixelArea, rotation, flipH, flipV);
+      onCropComplete(croppedDataUrl);
+    } catch {
+      toast.error("裁剪失败，请重试");
+    } finally {
+      setCropping(false);
+    }
+  }, [imageSrc, croppedAreaPixels, onCropComplete, rotation, flipH, flipV, isFreeCrop, getFreeCropPixels]);
+
+  const handleClose = useCallback(() => onClose(), [onClose]);
+
   // 键盘快捷键
   useEffect(() => {
     if (!open) return;
@@ -300,7 +331,7 @@ export function ImageCropDialog({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, croppedAreaPixels, imageSrc, cropping, freeCropRect, rotation, flipH, flipV]);
+  }, [open, croppedAreaPixels, imageSrc, cropping, freeCropRect, rotation, flipH, flipV, handleClose, handleConfirm]);
 
   // 滚轮缩放（仅固定比例模式）
   useEffect(() => {
@@ -343,37 +374,6 @@ export function ImageCropDialog({
   const handleZoomIn = useCallback(() => setZoom((prev) => Math.min(maxZoom, Math.round((prev + 0.2) * 10) / 10)), [maxZoom]);
   const handleZoomOut = useCallback(() => setZoom((prev) => Math.max(1, Math.round((prev - 0.2) * 10) / 10)), []);
 
-  // 自由裁剪：计算像素区域
-  const getFreeCropPixels = useCallback((): Area | null => {
-    if (!freeImageSize) return null;
-    // 旋转 90/270 度时宽高互换
-    const isRotated90or270 = rotation === 90 || rotation === 270;
-    const imgW = isRotated90or270 ? freeImageSize.h : freeImageSize.w;
-    const imgH = isRotated90or270 ? freeImageSize.w : freeImageSize.h;
-    return {
-      x: Math.round(freeCropRect.x * imgW),
-      y: Math.round(freeCropRect.y * imgH),
-      width: Math.round(freeCropRect.width * imgW),
-      height: Math.round(freeCropRect.height * imgH),
-    };
-  }, [freeCropRect, freeImageSize, rotation]);
-
-  const handleConfirm = useCallback(async () => {
-    const pixelArea = isFreeCrop ? getFreeCropPixels() : croppedAreaPixels;
-    if (!pixelArea) return;
-    setCropping(true);
-    try {
-      const croppedDataUrl = await getCroppedImg(imageSrc, pixelArea, rotation, flipH, flipV);
-      onCropComplete(croppedDataUrl);
-    } catch {
-      toast.error("裁剪失败，请重试");
-    } finally {
-      setCropping(false);
-    }
-  }, [imageSrc, croppedAreaPixels, onCropComplete, rotation, flipH, flipV, isFreeCrop, getFreeCropPixels]);
-
-  const handleClose = useCallback(() => onClose(), [onClose]);
-
   // 自由裁剪的图片加载
   const handleFreeImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -403,6 +403,7 @@ export function ImageCropDialog({
           {isFreeCrop ? (
             // 自由裁剪模式：自研裁剪框
             <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageSrc}
                 alt="裁剪"

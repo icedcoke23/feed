@@ -10,6 +10,8 @@ export function useStudentActions(
   classes: ClassItem[],
   teachers: Teacher[]
 ) {
+  void teachers;
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);

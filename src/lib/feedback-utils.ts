@@ -3,7 +3,6 @@ import {
   GraduationCap,
   Tag,
   FileText,
-  CheckCircle2,
   Camera,
   Download,
 } from "lucide-react";
@@ -96,19 +95,6 @@ function detectSection(line: string): SectionKey | "" {
   if (/^总结|^概括|^小结|^总体评价|^教师评语|^综合评价|^整体评价|^教师寄语/.test(clean)) return "summary";
 
   return "";
-}
-
-function isHeaderLine(line: string): boolean {
-  const trimmed = line.trim();
-  if (!trimmed) return false;
-  // Markdown 标题
-  if (/^#{1,6}\s/.test(trimmed)) return true;
-  // 带【】的标题
-  if (/^[【\[][^】\]]+[】\]]$/.test(trimmed)) return true;
-  // 纯数字标题 + 中文
-  if (/^\d+[\.、]\s*[\u4e00-\u9fa5]+/.test(trimmed)) return true;
-  // _detected section header
-  return !!detectSection(line);
 }
 
 /** 统计非空段落数 */

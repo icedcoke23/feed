@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,6 @@ const ClassFormDialog = dynamic(() => import("@/components/business/class-form-d
 
 export default function HomePage() {
   const { logout } = useAuth();
-  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const {

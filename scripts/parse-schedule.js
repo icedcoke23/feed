@@ -65,7 +65,7 @@ for (let i = 1; i < data.length; i++) {
 
   // 检查是否是课程行（包含课程名）
   let hasCourse = false;
-  for (const [colStr, teacher] of Object.entries(teacherCols)) {
+  for (const colStr of Object.keys(teacherCols)) {
     const col = parseInt(colStr);
     const cellVal = row[col];
     if (cellVal && typeof cellVal === 'string' && cellVal.trim()) {
@@ -86,7 +86,7 @@ for (let i = 1; i < data.length; i++) {
 
   // 如果当前行有课程名，下一行是学生列表
   if (hasCourse) {
-    for (const [colStr, teacher] of Object.entries(teacherCols)) {
+    for (const colStr of Object.keys(teacherCols)) {
       const col = parseInt(colStr);
       const courseCell = row[col];
       if (!courseCell || typeof courseCell !== 'string') continue;

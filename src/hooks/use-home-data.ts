@@ -103,7 +103,7 @@ export function useHomeData() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [user]);
+  }, []);
 
   const loadMoreStudents = useCallback(() => {
     if (studentsPagination && studentsPage < studentsPagination.totalPages) {
@@ -128,7 +128,7 @@ export function useHomeData() {
       classes.forEach(cls => { initial[cls.id] = true; });
       setExpandedClasses(initial);
     }
-  }, [classes]);
+  }, [classes, expandedClasses]);
 
   const teachersFromClasses = useMemo(() => {
     return [...new Map(

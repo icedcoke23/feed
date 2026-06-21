@@ -33,6 +33,8 @@ export function useCourseStages() {
   }, []);
 
   const saveCourseStage = useCallback(async (editingStage: Partial<CourseStage>, isAdding: boolean) => {
+    void isAdding;
+
     if (!editingStage.stage_name || !editingStage.theme || !editingStage.level) {
       toast.error("请填写必填项");
       return false;
@@ -98,7 +100,7 @@ export function useCourseStages() {
           } else {
             toast.error("删除失败");
           }
-        } catch (error) {
+        } catch {
           toast.error("删除失败");
         }
       },
@@ -134,7 +136,7 @@ export function useCourseStages() {
           }
           toast.success(`成功添加 ${successCount} 个预设`);
           fetchCourseStages();
-        } catch (error) {
+        } catch {
           toast.error("添加预设失败");
         } finally {
           setSaving(false);
@@ -167,7 +169,7 @@ export function useCourseStages() {
             const error = await response.json();
             toast.error(error.error || "重置失败");
           }
-        } catch (error) {
+        } catch {
           toast.error("重置失败");
         } finally {
           setSaving(false);
@@ -215,6 +217,8 @@ export function useTags() {
   }, []);
 
   const saveTag = useCallback(async (editingTag: Partial<Tag>, isAddingTag: boolean) => {
+    void isAddingTag;
+
     if (!editingTag.name || !editingTag.category) {
       toast.error("请填写标签名称和分类");
       return false;
@@ -281,7 +285,7 @@ export function useTags() {
           } else {
             toast.error("删除失败");
           }
-        } catch (error) {
+        } catch {
           toast.error("删除失败");
         }
       },
@@ -325,6 +329,8 @@ export function useThemes() {
   }, []);
 
   const saveTheme = useCallback(async (editingTheme: Partial<Theme>, isAddingTheme: boolean) => {
+    void isAddingTheme;
+
     if (!editingTheme.name) {
       toast.error("请填写主题名称");
       return false;
@@ -391,7 +397,7 @@ export function useThemes() {
           } else {
             toast.error("删除失败");
           }
-        } catch (error) {
+        } catch {
           toast.error("删除失败");
         }
       },
@@ -582,7 +588,7 @@ export function useAISettings() {
   };
 }
 
-export function useUsers(userRole?: string) {
+export function useUsers() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -682,7 +688,7 @@ export function useUsers(userRole?: string) {
             const error = await response.json();
             toast.error(error.error || "删除失败");
           }
-        } catch (error) {
+        } catch {
           toast.error("删除失败");
         }
       },

@@ -259,6 +259,7 @@ export function StudentPhotos({
                   className="relative group rounded-lg overflow-hidden border bg-gray-50"
                   style={{ aspectRatio: "4/3" }}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photo.url}
                     alt={`学员照片 ${index + 1}`}

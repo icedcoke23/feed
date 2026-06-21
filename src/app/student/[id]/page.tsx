@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -45,8 +45,6 @@ import {
   Edit,
   Trash2,
   Eye,
-  X,
-  Menu,
 } from "lucide-react";
 import Link from "next/link";
 import type { Teacher } from "@/types/teacher";
@@ -79,13 +77,7 @@ export default function StudentDetailPage() {
   const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchStudent();
-    fetchTeachers();
-    fetchClasses();
-  }, [params.id]);
-
-  const fetchTeachers = async () => {
+  const fetchTeachers = useCallback(async () => {
     try {
       const response = await fetch("/api/teachers");
       const data = await response.json();
@@ -94,9 +86,9 @@ export default function StudentDetailPage() {
       console.error("Failed to fetch teachers:", error);
       toast.error("获取教师列表失败");
     }
-  };
+  }, []);
 
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     try {
       const response = await fetch("/api/classes");
       const data = await response.json();
@@ -105,18 +97,18 @@ export default function StudentDetailPage() {
       console.error("Failed to fetch classes:", error);
       toast.error("获取班级列表失败");
     }
-  };
+  }, []);
 
-  const fetchStudent = async () => {
+  const fetchStudent = useCallback(async () => {
     try {
       const response = await fetch(`/api/students/${params.id}`);
       const data = await response.json();
-      
+
       if (!response.ok || !data.data) {
         toast.error("获取学员信息失败");
         return;
       }
-      
+
       setStudent(data.data);
       // 初始化编辑表单
       setEditForm({
@@ -133,7 +125,13 @@ export default function StudentDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
+
+  useEffect(() => {
+    fetchStudent();
+    fetchTeachers();
+    fetchClasses();
+  }, [fetchStudent, fetchTeachers, fetchClasses]);
 
   const handleSave = async () => {
     if (!student) return;

@@ -8,6 +8,8 @@ export function useBatchAdd(
   fetchData: () => Promise<void>,
   classes: ClassItem[]
 ) {
+  void classes;
+
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchInput, setBatchInput] = useState("");
   const [batchClassId, setBatchClassId] = useState("");

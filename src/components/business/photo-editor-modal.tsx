@@ -25,6 +25,7 @@ export function PhotoEditorModal({ photos, onRemovePhoto, onAddPhotos, onSave, o
           <div className="grid grid-cols-3 gap-3 mb-4">
             {photos.map((photo, index) => (
               <div key={photo.id} className="relative group rounded-lg overflow-hidden border bg-gray-50" style={{ aspectRatio: "4/3" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photo.url} alt={`照片 ${index + 1}`} className="w-full h-full object-cover" />
                 <button onClick={() => onRemovePhoto(photo.id)} className="absolute top-1 right-1 h-6 w-6 flex items-center justify-center rounded bg-red-500 text-white hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="删除">
                   <X className="h-3 w-3" />

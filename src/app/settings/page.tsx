@@ -89,6 +89,7 @@ export default function SettingsPage() {
         // 数据管理 Tab 不需要预加载数据
         break;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiSettingsHook.fetchAISettings, themesHook.fetchThemes, courseStagesHook.fetchCourseStages, tagsHook.fetchTags, usersHook.fetchUsers]);
 
   // 首次加载默认 Tab 数据
@@ -317,7 +318,6 @@ export default function SettingsPage() {
         {activeTab === "data" && user?.role === "admin" && (
           <DataManager
             onDataChanged={handleDataChanged}
-            userRole={user?.role}
           />
         )}
       </div>

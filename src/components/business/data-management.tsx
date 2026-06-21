@@ -31,10 +31,9 @@ import { sanitizeError } from "@/lib/sensitive-mask";
 
 interface DataManagerProps {
   onDataChanged: () => void;
-  userRole?: string;
 }
 
-export function DataManager({ onDataChanged, userRole }: DataManagerProps) {
+export function DataManager({ onDataChanged }: DataManagerProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
