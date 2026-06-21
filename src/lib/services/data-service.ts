@@ -1,4 +1,4 @@
-import { db } from "@/storage/database/drizzle-client";
+import { db, withTransaction } from "@/storage/database/drizzle-client";
 import {
   students,
   classes,
@@ -12,6 +12,8 @@ import {
 } from "@/storage/database/shared/schema";
 import { eq } from "drizzle-orm";
 import * as dataRepo from "@/lib/repositories/data-repository";
+import { hashPassword } from "@/lib/auth";
+import type { Database } from "@/storage/database/types";
 
 export interface ExportData {
   exportTime: string;
@@ -172,4 +174,80 @@ export async function importData(data: dataRepo.ImportData, mode: "overwrite" | 
 
 export async function fullImport(data: dataRepo.ImportData) {
   return dataRepo.importData(data, { clearFirst: true, isFullImport: true });
+}
+
+export interface ResetAdminResult {
+  adminCredentials: {
+    username: string;
+    passwordHint: string;
+  };
+  logs: string[];
+}
+
+function generateRandomPassword(length = 16): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+  let password = "";
+  const array = new Uint32Array(length);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < length; i++) {
+    password += chars[array[i] % chars.length];
+  }
+  return password;
+}
+
+/**
+ * 重置数据库：清空所有业务数据并创建新的管理员账户。
+ * 全程在单个事务中执行，确保数据一致性。
+ */
+export async function resetAdmin(): Promise<ResetAdminResult> {
+  const logs: string[] = [];
+  const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || generateRandomPassword();
+  const hashedPassword = await hashPassword(adminPassword);
+
+  await withTransaction(async (tx: Database) => {
+    // 1. 按外键依赖顺序删除业务数据
+    logs.push("开始删除业务数据...");
+    await tx.delete(classTransfers);
+    await tx.delete(feedbacks);
+    await tx.delete(students);
+    await tx.delete(classes);
+    await tx.delete(teachingThemes);
+    await tx.delete(tags);
+    await tx.delete(courseStages);
+    logs.push("✓ 业务数据已清空");
+
+    // 2. 删除所有教师（teachers 表）
+    await tx.delete(teachers);
+    logs.push("✓ 教师记录已删除");
+
+    // 3. 删除所有非管理员用户（保留 admin 之外的所有教师用户）
+    await tx.delete(users).where(eq(users.role, "teacher"));
+    logs.push("✓ 教师用户已删除");
+
+    // 4. 删除旧管理员（如果存在）
+    await tx.delete(users).where(eq(users.username, "admin"));
+    logs.push("✓ 旧管理员已删除");
+
+    // 5. 创建新管理员账户
+    const adminId = crypto.randomUUID();
+    await tx.insert(users).values({
+      id: adminId,
+      username: "admin",
+      password: hashedPassword,
+      name: "管理员",
+      role: "admin",
+      isActive: true,
+    });
+    logs.push("✓ 管理员账户已创建 (admin)");
+  });
+
+  return {
+    adminCredentials: {
+      username: "admin",
+      passwordHint: process.env.ADMIN_DEFAULT_PASSWORD
+        ? "请查看环境变量 ADMIN_DEFAULT_PASSWORD 配置"
+        : "密码已随机生成，请查看服务器日志",
+    },
+    logs,
+  };
 }
