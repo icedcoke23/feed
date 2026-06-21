@@ -1,15 +1,9 @@
 import { NextRequest } from "next/server";
-import { forbiddenError } from "@/lib/api-error";
+import { forbiddenError, badRequestError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { batchImportClassSchema } from "@/lib/validations/data-import";
 import * as batchImportService from "@/lib/services/batch-import-service";
-
-interface ClassData {
-  teacherName: string;
-  classTime: string;
-  courseName: string;
-  students: string[];
-}
 
 // POST /api/batch-import/classes - 批量导入班级
 export async function POST(request: NextRequest) {
@@ -24,13 +18,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { classes } = body as { classes: ClassData[] };
-
-    if (!classes || !Array.isArray(classes)) {
-      return errorResponse("请提供班级数据", 400);
+    const parsed = batchImportClassSchema.safeParse(body);
+    if (!parsed.success) {
+      return badRequestError("请求参数错误", parsed.error.flatten());
     }
 
-    const result = await batchImportService.importClasses(classes);
+    const result = await batchImportService.importClasses(parsed.data.classes);
 
     return successResponse(result);
   } catch (error) {

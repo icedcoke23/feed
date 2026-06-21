@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import * as dataService from "@/lib/services/data-service";
-import { handleDbError, forbiddenError } from "@/lib/api-error";
+import { handleDbError, forbiddenError, badRequestError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { resetAdminSchema } from "@/lib/validations/data-import";
 
 // POST /api/data/reset-admin - 清空所有数据并创建管理员账户
 export async function POST(request: NextRequest) {
@@ -16,6 +17,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const body = await request.json().catch(() => ({}));
+    const parsed = resetAdminSchema.safeParse(body);
+    if (!parsed.success) {
+      return badRequestError("请求参数错误", parsed.error.flatten());
+    }
+
     const result = await dataService.resetAdmin();
 
     return successResponse(

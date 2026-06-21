@@ -48,6 +48,6 @@ export function notFoundError(message: string = "资源未找到"): NextResponse
 }
 
 // 请求参数错误
-export function badRequestError(message: string = "请求参数错误"): NextResponse {
-  return apiError(message, 400);
+export function badRequestError(message: string = "请求参数错误", details?: unknown): NextResponse {
+  return errorResponse(message, 400, undefined, details);
 }

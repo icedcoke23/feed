@@ -3,6 +3,7 @@ import { forbiddenError, badRequestError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { getAdminTeacherMappings } from "@/lib/config/default-admins";
+import { updateAdminTeacherSchema } from "@/lib/validations/data-import";
 import * as batchImportService from "@/lib/services/batch-import-service";
 
 // POST /api/batch-import/update-admin-teacher - 批量更新学员教务老师
@@ -23,14 +24,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { students } = body as { students: batchImportService.UpdateAdminTeacherInput[] };
-
-    if (!students || !Array.isArray(students)) {
-      return errorResponse("请提供学员数据", 400);
+    const parsed = updateAdminTeacherSchema.safeParse(body);
+    if (!parsed.success) {
+      return badRequestError("请求参数错误", parsed.error.flatten());
     }
 
     const result = await batchImportService.updateAdminTeachers(
-      students,
+      parsed.data.students,
       adminTeacherMappings
     );
 

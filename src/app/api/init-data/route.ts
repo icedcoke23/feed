@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
-import { handleDbError } from "@/lib/api-error";
+import { handleDbError, badRequestError } from "@/lib/api-error";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { getAuthUser } from "@/lib/route-auth";
+import { initDataSchema } from "@/lib/validations/data-import";
 import * as initDataService from "@/lib/services/init-data-service";
 
 // POST /api/init-data - 初始化预设数据
@@ -12,6 +13,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const body = await request.json().catch(() => ({}));
+    const parsed = initDataSchema.safeParse(body);
+    if (!parsed.success) {
+      return badRequestError("请求参数错误", parsed.error.flatten());
+    }
+
     const result = await initDataService.initializeDefaults();
 
     if (result.skipped) {
