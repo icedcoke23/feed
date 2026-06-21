@@ -1,10 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { NextRequest } from "next/server";
 import { validateInput } from "@/lib/validations";
 import { insertTeachingThemeSchema } from "@/storage/database/shared/schema";
 import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import * as themeService from "@/lib/services/theme-service";
+import type { TeachingTheme } from "@/storage/database/shared/schema";
+
+function toThemeResponse(theme: TeachingTheme) {
+  return {
+    id: theme.id,
+    name: theme.name,
+    category: theme.category,
+    description: theme.description,
+    sort_order: theme.sortOrder,
+    is_active: theme.isActive,
+  };
+}
 
 // GET /api/themes - 获取教学主题列表
 export async function GET(request: NextRequest) {
@@ -13,28 +25,16 @@ export async function GET(request: NextRequest) {
     return errorResponse("未授权访问", 401);
   }
 
-  const client = getServerSupabaseClient();
   const { searchParams } = new URL(request.url);
-  const category = searchParams.get("category");
+  const category = searchParams.get("category") || undefined;
 
   try {
-    let query = client
-      .from("teaching_themes")
-      .select("*")
-      .or("is_active.eq.true,is_active.is.null")
-      .order("sort_order", { ascending: true });
-
-    if (category) {
-      query = query.eq("category", category);
+    const result = await themeService.list(authUser, { category });
+    if (result instanceof Response) {
+      return result;
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      return handleDbError(error, "获取主题列表");
-    }
-
-    return successResponse(data);
+    return successResponse(result.map(toThemeResponse));
   } catch (error) {
     return handleDbError(error, "获取主题列表");
   }
@@ -47,7 +47,6 @@ export async function POST(request: NextRequest) {
     return errorResponse("未授权访问", 401);
   }
 
-  const client = getServerSupabaseClient();
   const body = await request.json();
 
   // 校验输入
@@ -56,23 +55,15 @@ export async function POST(request: NextRequest) {
   const validatedData = result.data;
 
   try {
-    const { data, error } = await client
-      .from("teaching_themes")
-      .insert({
-        name: validatedData.name,
-        category: validatedData.category,
-        description: validatedData.description,
-        sort_order: validatedData.sortOrder || 0,
-        is_active: true,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      return handleDbError(error, "创建主题");
+    const data = await themeService.create(authUser, {
+      ...validatedData,
+      isActive: true,
+    });
+    if (data instanceof Response) {
+      return data;
     }
 
-    return successResponse(data);
+    return successResponse(toThemeResponse(data));
   } catch (error) {
     return handleDbError(error, "创建主题");
   }

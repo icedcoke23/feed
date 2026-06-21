@@ -1,15 +1,14 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { validateInput } from "@/lib/validations";
 import { insertStudentSchema } from "@/storage/database/shared/schema";
 import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse, paginatedResponse } from "@/lib/api-response";
-import { parsePagination, buildPaginationMeta } from "@/lib/pagination";
-import { withLogging } from "@/lib/api-logger";
+import { parsePagination } from "@/lib/pagination";
 import * as studentService from "@/lib/services/student-service";
 
 // GET /api/students - 获取学生列表
-export const GET = withLogging(async (request: NextRequest) => {
+export async function GET(request: NextRequest) {
   const authUser = await getAuthUser(request);
   if (!authUser) {
     return errorResponse("未授权访问", 401);
@@ -27,7 +26,7 @@ export const GET = withLogging(async (request: NextRequest) => {
       search: searchParams.get("search") || undefined,
     });
 
-    if ("error" in result) {
+    if (result instanceof NextResponse) {
       return result;
     }
 
@@ -35,10 +34,10 @@ export const GET = withLogging(async (request: NextRequest) => {
   } catch (error) {
     return handleDbError(error, "获取学生列表");
   }
-});
+}
 
 // POST /api/students - 创建学生
-export const POST = withLogging(async (request: NextRequest) => {
+export async function POST(request: NextRequest) {
   const authUser = await getAuthUser(request);
   if (!authUser) {
     return errorResponse("未授权访问", 401);
@@ -53,11 +52,11 @@ export const POST = withLogging(async (request: NextRequest) => {
 
   try {
     const data = await studentService.create(authUser, validatedData);
-    if ("error" in data) {
+    if (data instanceof NextResponse) {
       return data;
     }
     return successResponse(data);
   } catch (error) {
     return handleDbError(error, "创建学生");
   }
-});
+}

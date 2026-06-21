@@ -1,5 +1,4 @@
-import { NextRequest } from "next/server";
-import { handleDbError } from "@/lib/api-error";
+import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import * as studentService from "@/lib/services/student-service";
@@ -18,7 +17,7 @@ export async function GET(
 
   try {
     const result = await studentService.history(authUser, id);
-    if ("error" in result) {
+    if (result instanceof NextResponse) {
       return result;
     }
     return successResponse(result);

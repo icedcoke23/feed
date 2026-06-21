@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { NextRequest } from "next/server";
 import { z } from "zod";
 import { validateInput } from "@/lib/validations";
 import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import * as themeService from "@/lib/services/theme-service";
+import type { TeachingTheme } from "@/storage/database/shared/schema";
 
 const themeItemSchema = z.object({
   name: z.string().min(1, "主题名称不能为空"),
@@ -16,6 +17,17 @@ const batchThemesSchema = z.object({
   themes: z.array(themeItemSchema).min(1, "请提供主题数据").max(100, "单次最多导入100条记录"),
 });
 
+function toThemeResponse(theme: TeachingTheme) {
+  return {
+    id: theme.id,
+    name: theme.name,
+    category: theme.category,
+    description: theme.description,
+    sort_order: theme.sortOrder,
+    is_active: theme.isActive,
+  };
+}
+
 // POST /api/themes/batch - 批量添加教学主题
 export async function POST(request: NextRequest) {
   const authUser = await getAuthUser(request);
@@ -23,7 +35,6 @@ export async function POST(request: NextRequest) {
     return errorResponse("未授权访问", 401);
   }
 
-  const client = getServerSupabaseClient();
   const body = await request.json();
 
   // 校验输入
@@ -37,24 +48,19 @@ export async function POST(request: NextRequest) {
       name: t.name,
       category: t.category || "",
       description: t.description || "",
-      sort_order: index + 1,
-      is_active: true,
+      sortOrder: index + 1,
+      isActive: true,
     }));
 
     // 批量插入
-    const { data, error } = await client
-      .from("teaching_themes")
-      .insert(themesData)
-      .select();
-
-    if (error) {
-      console.error("Batch insert error:", error);
-      return handleDbError(error, "批量添加主题");
+    const data = await themeService.batchCreate(authUser, themesData);
+    if (data instanceof Response) {
+      return data;
     }
 
-    return successResponse(data, `成功添加 ${data?.length || 0} 个主题`);
+    return successResponse(data.map(toThemeResponse), `成功添加 ${data.length} 个主题`);
   } catch (error) {
     console.error("Batch add themes error:", error);
-    return errorResponse("批量添加失败", 500);
+    return handleDbError(error, "批量添加主题");
   }
 }

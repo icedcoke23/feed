@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateInput } from "@/lib/validations";
 import { handleDbError } from "@/lib/api-error";
@@ -33,7 +33,7 @@ export async function POST(
       targetClassId: validatedData.targetClassId,
     });
 
-    if ("error" in data) {
+    if (data instanceof NextResponse) {
       return data;
     }
 

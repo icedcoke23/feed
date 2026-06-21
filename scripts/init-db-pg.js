@@ -1,10 +1,8 @@
-// 通过 pg 库直接连接 PostgreSQL 创建表结构 + 管理员账户
+// 通过 pg 库直接连接本地 PostgreSQL 创建表结构 + 管理员账户
+// 推荐使用 drizzle-kit 管理迁移：pnpm db:push
+// 此脚本作为一次性初始化或演示环境使用
 const { Client } = require('pg');
 const bcrypt = require('bcryptjs');
-
-// Supabase PostgreSQL 直连信息
-// 格式: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
-// 需要从 Supabase Dashboard -> Settings -> Database 获取连接字符串
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -174,18 +172,15 @@ async function main() {
   if (!DATABASE_URL) {
     console.error('请设置 DATABASE_URL 环境变量');
     console.error('');
-    console.error('获取方式：');
-    console.error('1. 打开 Supabase Dashboard (https://supabase.com/dashboard)');
-    console.error('2. 选择项目 -> Settings -> Database');
-    console.error('3. 复制 Connection string (URI 格式)');
+    console.error('例如：');
+    console.error('  export DATABASE_URL="postgresql://username:password@localhost:5432/feedback_db"');
     console.error('');
     console.error('运行命令：');
-    console.error('$env:DATABASE_URL="postgresql://postgres.xdodptuuwiojkuwvptsi:YOUR_PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"');
-    console.error('node scripts/init-db-pg.js');
+    console.error('  node scripts/init-db-pg.js');
     process.exit(1);
   }
 
-  const client = new Client({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  const client = new Client({ connectionString: DATABASE_URL });
 
   try {
     console.log('连接数据库...');

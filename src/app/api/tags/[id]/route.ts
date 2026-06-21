@@ -1,10 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { NextRequest } from "next/server";
 import { validateInput } from "@/lib/validations";
 import { insertTagSchema } from "@/storage/database/shared/schema";
 import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import * as tagService from "@/lib/services/tag-service";
+import type { Tag } from "@/storage/database/shared/schema";
+
+function toTagResponse(tag: Tag) {
+  return {
+    id: tag.id,
+    category: tag.category,
+    name: tag.name,
+    description: tag.description,
+    sort_order: tag.sortOrder,
+    is_active: tag.isActive,
+  };
+}
 
 // GET /api/tags/[id] - 获取单个标签
 export async function GET(
@@ -16,21 +28,15 @@ export async function GET(
     return errorResponse("未授权访问", 401);
   }
 
-  const client = getServerSupabaseClient();
   const { id } = await params;
 
   try {
-    const { data, error } = await client
-      .from("tags")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) {
-      return handleDbError(error, "获取标签");
+    const data = await tagService.findById(authUser, id);
+    if (data instanceof Response) {
+      return data;
     }
 
-    return successResponse(data);
+    return successResponse(toTagResponse(data));
   } catch (error) {
     return handleDbError(error, "获取标签");
   }
@@ -46,7 +52,6 @@ export async function PUT(
     return errorResponse("未授权访问", 401);
   }
 
-  const client = getServerSupabaseClient();
   const { id } = await params;
   const body = await request.json();
 
@@ -55,23 +60,12 @@ export async function PUT(
   const validatedData = result.data;
 
   try {
-    const { data, error } = await client
-      .from("tags")
-      .update({
-        category: validatedData.category,
-        name: validatedData.name,
-        description: validatedData.description,
-        sort_order: validatedData.sortOrder,
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      return handleDbError(error, "更新标签");
+    const data = await tagService.update(authUser, id, validatedData);
+    if (data instanceof Response) {
+      return data;
     }
 
-    return successResponse(data);
+    return successResponse(toTagResponse(data));
   } catch (error) {
     return handleDbError(error, "更新标签");
   }
@@ -87,17 +81,12 @@ export async function DELETE(
     return errorResponse("未授权访问", 401);
   }
 
-  const client = getServerSupabaseClient();
   const { id } = await params;
 
   try {
-    const { error } = await client
-      .from("tags")
-      .update({ is_active: false })
-      .eq("id", id);
-
-    if (error) {
-      return handleDbError(error, "删除标签");
+    const result = await tagService.remove(authUser, id);
+    if (result instanceof Response) {
+      return result;
     }
 
     return successResponse(null, "删除成功");

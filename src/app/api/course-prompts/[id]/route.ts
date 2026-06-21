@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
 import { validateInput } from "@/lib/validations";
 import { z } from "zod";
-import { handleDbError, forbiddenError, notFoundError } from "@/lib/api-error";
+import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import * as coursePromptService from "@/lib/services/course-prompt-service";
 
 const updateCoursePromptSchema = z.object({
   stage_code: z.string().min(1).optional(),
@@ -24,22 +24,12 @@ export async function GET(
     return errorResponse("未授权访问", 401);
   }
 
-  const client = getServerSupabaseClient();
   const { id } = await params;
 
   try {
-    const { data, error } = await client
-      .from("course_prompts")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (error) {
-      return handleDbError(error, "获取课程提示词");
-    }
-
-    if (!data) {
-      return notFoundError("课程提示词未找到");
+    const data = await coursePromptService.findById(authUser, id);
+    if (data instanceof Response) {
+      return data;
     }
 
     return successResponse(data);
@@ -58,35 +48,16 @@ export async function PUT(
     return errorResponse("未授权访问", 401);
   }
 
-  if (authUser.userRole !== "admin") {
-    return forbiddenError("仅管理员可访问");
-  }
-
-  const client = getServerSupabaseClient();
   const { id } = await params;
   const body = await request.json();
 
   const result = validateInput(updateCoursePromptSchema, body);
   if ("error" in result) return result.error;
-  const validatedData = result.data;
 
   try {
-    const { data, error } = await client
-      .from("course_prompts")
-      .update({
-        stage_code: validatedData.stage_code,
-        system_prompt: validatedData.system_prompt,
-        report_structure: validatedData.report_structure,
-        word_limit: validatedData.word_limit,
-        is_active: validatedData.is_active,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      return handleDbError(error, "更新课程提示词");
+    const data = await coursePromptService.update(authUser, id, result.data);
+    if (data instanceof Response) {
+      return data;
     }
 
     return successResponse(data);
@@ -105,21 +76,12 @@ export async function DELETE(
     return errorResponse("未授权访问", 401);
   }
 
-  if (authUser.userRole !== "admin") {
-    return forbiddenError("仅管理员可访问");
-  }
-
-  const client = getServerSupabaseClient();
   const { id } = await params;
 
   try {
-    const { error } = await client
-      .from("course_prompts")
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq("id", id);
-
-    if (error) {
-      return handleDbError(error, "删除课程提示词");
+    const result = await coursePromptService.remove(authUser, id);
+    if (result instanceof Response) {
+      return result;
     }
 
     return successResponse(null, "删除成功");

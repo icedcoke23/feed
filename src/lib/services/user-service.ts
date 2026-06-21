@@ -94,6 +94,10 @@ export async function findById(user: AuthUserResult, id: string) {
   return enriched;
 }
 
+export async function findByUsername(username: string) {
+  return repo.findByUsername(username);
+}
+
 export interface CreateUserInput {
   username: string;
   name: string;

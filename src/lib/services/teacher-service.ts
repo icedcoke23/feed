@@ -1,5 +1,8 @@
 import * as repo from "@/lib/repositories/teacher-repository";
 import * as lookupCache from "@/lib/services/lookup-service";
+import { db } from "@/storage/database/drizzle-client";
+import { users } from "@/storage/database/shared/schema";
+import { eq } from "drizzle-orm";
 import { buildPaginationMeta } from "@/lib/pagination";
 import { forbiddenError } from "@/lib/api-error";
 import { maskPhone, maskEmail } from "@/lib/sensitive-mask";
@@ -56,7 +59,23 @@ export async function update(
   payload: Parameters<typeof repo.update>[1]
 ) {
   if (!isAdmin(user)) return forbiddenError("权限不足");
-  const result = await repo.update(id, payload);
+
+  const result = await db.transaction(async (tx) => {
+    const updated = await repo.update(id, payload, tx);
+    if (!updated) return null;
+
+    // 同步更新 users 表的 name 和 phone
+    await tx
+      .update(users)
+      .set({
+        name: payload.name,
+        phone: payload.phone,
+      })
+      .where(eq(users.id, id));
+
+    return updated;
+  });
+
   if (!result) return null;
   lookupCache.invalidateTeachers();
   return toResponse(result);
@@ -64,6 +83,11 @@ export async function update(
 
 export async function remove(user: AuthUserResult, id: string) {
   if (!isAdmin(user)) return forbiddenError("权限不足");
-  await repo.remove(id);
+
+  await db.transaction(async (tx) => {
+    await tx.delete(users).where(eq(users.id, id));
+    await repo.remove(id, tx);
+  });
+
   lookupCache.invalidateTeachers();
 }

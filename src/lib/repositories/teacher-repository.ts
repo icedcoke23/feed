@@ -8,14 +8,16 @@ export interface ListTeachersOptions {
   limit: number;
   isActive?: boolean;
   search?: string;
+  role?: string;
 }
 
 export async function list(options: ListTeachersOptions, db: Database = database) {
-  const { page, limit, isActive, search } = options;
+  const { page, limit, isActive, search, role } = options;
   const offset = (page - 1) * limit;
 
   const conditions = [
     isActive !== undefined ? eq(teachers.isActive, isActive) : undefined,
+    role ? eq(teachers.role, role) : undefined,
     search
       ? or(
           like(teachers.name, `%${search}%`),

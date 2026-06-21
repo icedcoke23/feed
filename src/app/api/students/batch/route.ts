@@ -1,7 +1,6 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateInput } from "@/lib/validations";
-import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import * as studentService from "@/lib/services/student-service";
@@ -38,7 +37,7 @@ export async function POST(request: NextRequest) {
       classId: validatedData.classId,
     });
 
-    if ("error" in data) {
+    if (data instanceof NextResponse) {
       return data;
     }
 

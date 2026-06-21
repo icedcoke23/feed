@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { NextRequest } from "next/server";
 import { z } from "zod";
 import { validateInput } from "@/lib/validations";
 import { isSafeUrlAsync } from "@/lib/ssrf-guard";
@@ -7,6 +6,7 @@ import https from "https";
 import http from "http";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import * as aiSettingService from "@/lib/services/ai-setting-service";
 
 const testSchema = z.object({
   api_key: z.string().min(1),
@@ -21,23 +21,6 @@ const testSchema = z.object({
 // 判断是否为掩码格式的密钥
 function isMaskedKey(key: string): boolean {
   return key.includes("****");
-}
-
-// 从数据库获取AI设置
-async function getDbAISettings(): Promise<Record<string, string>> {
-  const client = getServerSupabaseClient();
-  const { data, error } = await client
-    .from("ai_settings")
-    .select("*")
-    .order("setting_key");
-
-  if (error || !data) return {};
-
-  const settings: Record<string, string> = {};
-  data.forEach((item) => {
-    settings[item.setting_key] = item.setting_value || "";
-  });
-  return settings;
 }
 
 // POST /api/ai-settings/test - 测试AI连接
@@ -62,10 +45,14 @@ export async function POST(request: NextRequest) {
     const { api_key, base_url, model_id, use_custom_ai } = result.data;
 
     // 从数据库获取完整密钥（GET接口返回的是掩码版本）
-    const dbSettings = await getDbAISettings();
+    const rawSettings = await aiSettingService.getRaw(authUser);
+    if (rawSettings instanceof Response) {
+      return rawSettings;
+    }
+
     const resolvedApiKey = api_key && !isMaskedKey(api_key)
       ? api_key  // 前端传入的新密钥
-      : dbSettings.api_key;  // 使用数据库中的密钥
+      : rawSettings?.apiKey || "";  // 使用数据库中的密钥
 
     // 如果使用自定义AI（第三方AI）
     if (use_custom_ai === true && resolvedApiKey && base_url) {

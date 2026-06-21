@@ -7,7 +7,6 @@ import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse, paginatedResponse } from "@/lib/api-response";
 import { parsePagination } from "@/lib/pagination";
 import * as userService from "@/lib/services/user-service";
-import * as userRepo from "@/lib/repositories/user-repository";
 
 // 用户创建 schema：在 insertUserSchema 基础上增加 password
 const createUserSchema = insertUserSchema.extend({
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // 检查用户名是否已存在
-    const existingUser = await userRepo.findByUsername(validatedData.username);
+    const existingUser = await userService.findByUsername(validatedData.username);
     if (existingUser) {
       return errorResponse(
         `用户名 "${validatedData.username}" 已存在，请使用其他用户名`,

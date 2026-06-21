@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { validateInput } from "@/lib/validations";
 import { insertStudentSchema } from "@/storage/database/shared/schema";
 import { handleDbError } from "@/lib/api-error";
@@ -20,7 +20,7 @@ export async function GET(
 
   try {
     const data = await studentService.findById(authUser, id);
-    if ("error" in data) {
+    if (data instanceof NextResponse) {
       return data;
     }
     return successResponse(data);
@@ -48,7 +48,7 @@ export async function PUT(
 
   try {
     const data = await studentService.update(authUser, id, validatedData);
-    if ("error" in data) {
+    if (data instanceof NextResponse) {
       return data;
     }
     return successResponse(data);
@@ -70,10 +70,7 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    const result = await studentService.remove(authUser, id);
-    if ("error" in result) {
-      return result;
-    }
+    await studentService.remove(authUser, id);
     return successResponse(null, "删除成功");
   } catch (error) {
     return handleDbError(error, "删除学生");

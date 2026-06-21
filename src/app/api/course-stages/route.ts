@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/storage/database/supabase-client";
+import { NextRequest } from "next/server";
 import { validateInput } from "@/lib/validations";
 import { z } from "zod";
-import { DEFAULT_COURSE_STAGES } from "@/lib/constants/course-stages";
-import { handleDbError, forbiddenError } from "@/lib/api-error";
+import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import * as courseStageService from "@/lib/services/course-stage-service";
 
 // 课程阶段创建 schema
 const createCourseStageSchema = z.object({
@@ -26,66 +25,19 @@ export async function GET(request: NextRequest) {
     return errorResponse("未授权访问", 401);
   }
 
-  const client = getServerSupabaseClient();
   const { searchParams } = new URL(request.url);
-  const theme = searchParams.get("theme");
-  const level = searchParams.get("level");
+  const theme = searchParams.get("theme") || undefined;
+  const level = searchParams.get("level") || undefined;
 
   try {
-    // 尝试从数据库获取 - 使用 or 条件同时获取 is_active 为 true 或 null 的记录
-    let query = client
-      .from("course_stages")
-      .select("*")
-      .or("is_active.eq.true,is_active.is.null") // 兼容 is_active 为 true 或 null 的记录
-      .order("sort_order", { ascending: true });
-
-    if (theme) {
-      query = query.eq("theme", theme);
-    }
-    if (level) {
-      query = query.eq("level", level);
+    const result = await courseStageService.list(authUser, { theme, level });
+    if (result instanceof Response) {
+      return result;
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Error fetching course stages:", error);
-      // 如果出错，返回默认预设
-      let filteredStages = DEFAULT_COURSE_STAGES;
-      if (theme) {
-        filteredStages = filteredStages.filter(s => s.theme === theme);
-      }
-      if (level) {
-        filteredStages = filteredStages.filter(s => s.level === level);
-      }
-      return successResponse(filteredStages);
-    }
-
-    // 如果数据库有数据，返回数据库数据
-    if (data && data.length > 0) {
-      return successResponse(data);
-    }
-
-    // 如果数据库没有数据，返回默认预设
-    let filteredStages = DEFAULT_COURSE_STAGES;
-    if (theme) {
-      filteredStages = filteredStages.filter(s => s.theme === theme);
-    }
-    if (level) {
-      filteredStages = filteredStages.filter(s => s.level === level);
-    }
-    return successResponse(filteredStages);
+    return successResponse(result);
   } catch (error) {
-    console.error("Exception in GET course-stages:", error);
-    // 如果出错，返回默认预设
-    let filteredStages = DEFAULT_COURSE_STAGES;
-    if (theme) {
-      filteredStages = filteredStages.filter(s => s.theme === theme);
-    }
-    if (level) {
-      filteredStages = filteredStages.filter(s => s.level === level);
-    }
-    return successResponse(filteredStages);
+    return handleDbError(error, "获取课程阶段列表");
   }
 }
 
@@ -96,11 +48,6 @@ export async function POST(request: NextRequest) {
     return errorResponse("未授权访问", 401);
   }
 
-  if (authUser.userRole !== "admin") {
-    return forbiddenError("仅管理员可访问");
-  }
-
-  const client = getServerSupabaseClient();
   const body = await request.json();
 
   // 校验输入
@@ -109,24 +56,12 @@ export async function POST(request: NextRequest) {
   const validatedData = result.data;
 
   try {
-    const { data, error } = await client
-      .from("course_stages")
-      .insert({
-        stage_code: validatedData.stageCode,
-        stage_name: validatedData.stageName,
-        theme: validatedData.theme,
-        level: validatedData.level,
-        description: validatedData.description,
-        content: validatedData.content,
-        goal: validatedData.goal,
-        sort_order: validatedData.sortOrder || 0,
-        is_active: true, // 显式设置为 true，确保可以被查询到
-      })
-      .select()
-      .single();
-
-    if (error) {
-      return handleDbError(error, "创建课程阶段");
+    const data = await courseStageService.create(authUser, {
+      ...validatedData,
+      isActive: true,
+    });
+    if (data instanceof Response) {
+      return data;
     }
 
     return successResponse(data);
