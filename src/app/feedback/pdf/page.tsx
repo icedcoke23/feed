@@ -11,6 +11,7 @@ import { PhotoEditorModal } from "@/components/business/photo-editor-modal";
 import { ImageCropDialog } from "@/components/business/image-crop-dialog";
 import { usePdfPagination } from "@/hooks/use-pdf-pagination";
 import { usePhotoEditor } from "@/hooks/use-photo-editor";
+import { loadPdfReportData, savePdfReportData, transferToTempReport } from "@/lib/pdf-session";
 
 // 页面配置
 const PAGE_WIDTH = 210; // mm
@@ -62,29 +63,23 @@ function PDFPreviewPageContent() {
 
   // 加载报告数据
   useEffect(() => {
-    const storedData = localStorage.getItem("pdfReportData");
-    if (storedData) {
-      try {
-        const parsed = JSON.parse(storedData) as ReportData;
-        // 兼容旧数据：未设置校区时默认南沙万达校区
-        if (!parsed.campus || parsed.campus.trim() === "") {
-          parsed.campus = "南沙万达校区";
-        }
-        console.log("[PDF] studentPhotos:", parsed.studentPhotos);
-        setReportData(parsed);
+    const data = loadPdfReportData();
+    if (data) {
+      // 兼容旧数据：未设置校区时默认南沙万达校区
+      if (!data.campus || data.campus.trim() === "") {
+        data.campus = "南沙万达校区";
       }
-      catch (e) {
-        console.error("Failed to parse report data:", e);
-        console.error("[PDF] Raw data that failed to parse:", storedData);
-        setNoData(true);
-      }
+      console.log("[PDF] studentPhotos:", data.studentPhotos);
+      setReportData(data);
+    } else {
+      setNoData(true);
     }
   }, []);
 
   // 超时检测
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!localStorage.getItem("pdfReportData")) setNoData(true);
+      if (!loadPdfReportData()) setNoData(true);
     }, 3000);
     return () => clearTimeout(timer);
   }, []);
@@ -92,11 +87,7 @@ function PDFPreviewPageContent() {
   // 同步到 localStorage：任何字段编辑后立即持久化，确保刷新不丢失
   useEffect(() => {
     if (reportData) {
-      try {
-        localStorage.setItem("pdfReportData", JSON.stringify(reportData));
-      } catch (e) {
-        console.error("localStorage 同步失败:", e);
-      }
+      savePdfReportData(reportData);
     }
   }, [reportData]);
 
@@ -191,8 +182,7 @@ function PDFPreviewPageContent() {
   };
 
   const handleBack = () => {
-    const storedData = localStorage.getItem("pdfReportData");
-    if (storedData) localStorage.setItem("tempReportData", storedData);
+    transferToTempReport();
     router.push("/feedback/new?step=4&restore=true");
   };
 

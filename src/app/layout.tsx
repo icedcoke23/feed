@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/contexts/auth-context';
 import { RouteGuard } from '@/components/auth/route-guard';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { SWRProvider } from '@/components/providers/swr-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -49,9 +50,11 @@ export default function RootLayout({
         <AuthProvider>
           {isDev && <Inspector />}
           <ErrorBoundary>
-            <RouteGuard>
-              {children}
-            </RouteGuard>
+            <SWRProvider>
+              <RouteGuard>
+                {children}
+              </RouteGuard>
+            </SWRProvider>
           </ErrorBoundary>
           <Toaster position="top-center" richColors />
         </AuthProvider>

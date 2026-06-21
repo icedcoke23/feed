@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Star, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,7 @@ interface TagRatingItemProps {
   selectedBgColor?: string;
 }
 
-export function TagRatingItem({
+export const TagRatingItem = memo(function TagRatingItem({
   tag,
   isSelected,
   rating,
@@ -109,4 +110,4 @@ export function TagRatingItem({
       )}
     </div>
   );
-}
+});

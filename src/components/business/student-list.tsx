@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +26,7 @@ interface StudentCardProps {
   onTransfer: (student: Student) => void;
 }
 
-export function StudentCard({ student, onEdit, onTransfer }: StudentCardProps) {
+export const StudentCard = memo(function StudentCard({ student, onEdit, onTransfer }: StudentCardProps) {
   return (
     <Card className="group hover:shadow-md transition-all duration-200">
       <CardContent className="p-4">
@@ -97,7 +98,7 @@ export function StudentCard({ student, onEdit, onTransfer }: StudentCardProps) {
       </CardContent>
     </Card>
   );
-}
+});
 
 interface StudentListProps {
   filteredStudents: Student[];
