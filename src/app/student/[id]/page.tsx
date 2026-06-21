@@ -133,6 +133,19 @@ export default function StudentDetailPage() {
     fetchClasses();
   }, [fetchStudent, fetchTeachers, fetchClasses]);
 
+  // 同步编辑表单：当学员数据变化或进入编辑态时刷新表单字段
+  useEffect(() => {
+    if (!student) return;
+    setEditForm({
+      name: student.name || "",
+      grade: student.grade || "",
+      school: student.school || "",
+      phone: student.phone || "",
+      classId: student.class_id || "",
+      adminTeacherId: student.admin_teacher_id || "",
+    });
+  }, [student, isEditing]);
+
   const handleSave = async () => {
     if (!student) return;
     
