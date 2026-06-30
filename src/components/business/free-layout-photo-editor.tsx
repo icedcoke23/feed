@@ -103,7 +103,6 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
 
     // 过滤掉没有有效URL的照片
     const validPhotos = photos.slice(0, 6).filter(p => p.url && p.url.trim());
-    console.log('[PhotoEditor] input photos:', photos.length, 'validPhotos:', validPhotos.length, 'urls:', validPhotos.map(p => ({id: p.id, urlLen: p.url?.length, urlPrefix: p.url?.slice(0, 30)})));
     const count = validPhotos.length;
 
     // 清理已不存在照片的失败记录
@@ -282,7 +281,6 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
                   src={layout.url}
                   alt="学员照片"
                   loading="eager"
-                  onLoad={() => console.log('[Photo] loaded:', layout.id)}
                   onError={() => {
                     console.error('[Photo] load failed:', layout.id, layout.url);
                     setFailedImageIds(prev => new Set(prev).add(layout.id));

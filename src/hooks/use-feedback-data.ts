@@ -112,10 +112,7 @@ export function useFeedbackData() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchFeedbackHistory = useCallback(async (studentId: string) => {
-    if (!studentId) {
-      console.warn("[History] skipped: empty studentId");
-      return;
-    }
+    if (!studentId) return;
 
     // 取消前一次请求
     abortControllerRef.current?.abort();
@@ -124,7 +121,6 @@ export function useFeedbackData() {
 
     try {
       const url = `/api/feedbacks?studentId=${encodeURIComponent(studentId)}&limit=3`;
-      console.log(`[History] fetching: ${url}`);
 
       const response = await fetch(url, {
         signal: controller.signal,
@@ -149,7 +145,6 @@ export function useFeedbackData() {
 
       const result = await response.json();
       const rawFeedbacks = Array.isArray(result.data) ? result.data : [];
-      console.log(`[History] raw count: ${rawFeedbacks.length}`);
 
       const history: FeedbackHistory[] = rawFeedbacks.map((fb: Record<string, unknown>) => {
         const metadata =
@@ -192,7 +187,6 @@ export function useFeedbackData() {
       });
 
       setFeedbackHistory(history);
-      console.log(`[History] mapped count: ${history.length}`);
     } catch (error) {
       if ((error as Error).name === "AbortError") return;
       console.error("[History] unexpected error:", error);

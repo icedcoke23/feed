@@ -1,13 +1,11 @@
 "use client";
 
-import { Calendar, CheckCircle2, X, Plus, Trash2, GraduationCap } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
+import { Calendar, CheckCircle2, X, Plus, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -16,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { FeedbackTeacher, CoursePlan, CourseStagePreset } from "@/types/feedback";
+import { CoursePlanRow, type StageStatus } from "@/components/business/course-plan-row";
 
 interface CoursePlanEditorProps {
   teachers: FeedbackTeacher[];
@@ -48,6 +47,44 @@ export function CoursePlanEditor({
   onSetCoursePlans,
   onSetCurrentStageId,
 }: CoursePlanEditorProps) {
+  // latest-ref：保持回调引用稳定，避免 CoursePlanRow 因回调变化而全量 re-render。
+  // ref 在 effect 中同步（React 19 禁止 render 阶段写 ref），回调读取最新值。
+  const coursePlansRef = useRef(coursePlans);
+  useEffect(() => {
+    coursePlansRef.current = coursePlans;
+  }, [coursePlans]);
+  const currentStageIdRef = useRef(currentStageId);
+  useEffect(() => {
+    currentStageIdRef.current = currentStageId;
+  }, [currentStageId]);
+
+  const handleFieldChange = useCallback(
+    (planId: string, field: keyof CoursePlan, value: string) => {
+      // 不可变更新：仅被修改的行获得新对象引用，其余行引用不变，被 memo 拦截
+      onSetCoursePlans(
+        coursePlansRef.current.map((p) => (p.id === planId ? { ...p, [field]: value } : p))
+      );
+    },
+    [onSetCoursePlans]
+  );
+
+  const handleDelete = useCallback(
+    (planId: string) => {
+      onSetCoursePlans(coursePlansRef.current.filter((p) => p.id !== planId));
+      if (planId === currentStageIdRef.current) {
+        onSetCurrentStageId(null);
+      }
+    },
+    [onSetCoursePlans, onSetCurrentStageId]
+  );
+
+  const handleToggleCurrent = useCallback(
+    (planId: string) => {
+      onSetCurrentStageId(currentStageIdRef.current === planId ? null : planId);
+    },
+    [onSetCurrentStageId]
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -207,126 +244,27 @@ export function CoursePlanEditor({
               </div>
             )}
 
-            {coursePlans.map((plan, index) => {
-              const getStageStatus = () => {
+            {coursePlans.map((plan) => {
+              // 在外层计算 stageStatus 作为基本类型 prop 传入，避免 Row 引用整个数组
+              const getStageStatus = (): StageStatus => {
                 if (plan.id === currentStageId) return "current";
                 const currentIndex = coursePlans.findIndex((p) => p.id === currentStageId);
                 if (currentIndex === -1) return "upcoming";
                 const planIndex = coursePlans.findIndex((p) => p.id === plan.id);
                 return planIndex < currentIndex ? "completed" : "upcoming";
               };
-              const stageStatus = getStageStatus();
 
               return (
-                <div
+                <CoursePlanRow
                   key={plan.id}
-                  className={`border rounded-lg p-4 space-y-3 relative transition-all ${
-                    stageStatus === "current"
-                      ? "border-blue-500 bg-blue-50 shadow-md"
-                      : stageStatus === "completed"
-                        ? "border-green-300 bg-green-50/50"
-                        : "border-gray-200"
-                  }`}
-                >
-                  <div className="absolute left-2 -top-2">
-                    {stageStatus === "current" && (
-                      <Badge className="bg-blue-500 text-white text-xs">当前阶段</Badge>
-                    )}
-                    {stageStatus === "completed" && (
-                      <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
-                        已学内容
-                      </Badge>
-                    )}
-                    {stageStatus === "upcoming" && currentStageId && (
-                      <Badge variant="outline" className="text-gray-500 text-xs">
-                        待学内容
-                      </Badge>
-                    )}
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-2 text-gray-400 hover:text-red-500"
-                    onClick={() => {
-                      const newPlans = coursePlans.filter((p) => p.id !== plan.id);
-                      onSetCoursePlans(newPlans);
-                      if (plan.id === currentStageId) {
-                        onSetCurrentStageId(null);
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-
-                  <div className="flex justify-end pt-4">
-                    <Button
-                      variant={plan.id === currentStageId ? "default" : "outline"}
-                      size="sm"
-                      className={plan.id === currentStageId ? "bg-blue-500 hover:bg-blue-600" : ""}
-                      onClick={() => {
-                        onSetCurrentStageId(plan.id === currentStageId ? null : plan.id);
-                      }}
-                    >
-                      {plan.id === currentStageId ? "✓ 当前阶段" : "设为当前阶段"}
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs text-gray-500">阶段(单元)</Label>
-                      <Input
-                        value={plan.stage || ""}
-                        onChange={(e) => {
-                          const updated = [...coursePlans];
-                          updated[index].stage = e.target.value;
-                          onSetCoursePlans(updated);
-                        }}
-                        placeholder="如：Scratch初阶"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">主题</Label>
-                      <Input
-                        value={plan.theme || ""}
-                        onChange={(e) => {
-                          const updated = [...coursePlans];
-                          updated[index].theme = e.target.value;
-                          onSetCoursePlans(updated);
-                        }}
-                        placeholder="如：Scratch"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-xs text-gray-500">教学内容</Label>
-                    <Textarea
-                      value={plan.content || ""}
-                      onChange={(e) => {
-                        const updated = [...coursePlans];
-                        updated[index].content = e.target.value;
-                        onSetCoursePlans(updated);
-                      }}
-                      placeholder="实验类型、学科属性、知识点等..."
-                      className="min-h-[80px]"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-xs text-gray-500">项目目标</Label>
-                    <Textarea
-                      value={plan.goal || ""}
-                      onChange={(e) => {
-                        const updated = [...coursePlans];
-                        updated[index].goal = e.target.value;
-                        onSetCoursePlans(updated);
-                      }}
-                      placeholder="教学目标和学习成果..."
-                      className="min-h-[60px]"
-                    />
-                  </div>
-                </div>
+                  plan={plan}
+                  stageStatus={getStageStatus()}
+                  isCurrentStage={plan.id === currentStageId}
+                  hasCurrentStage={!!currentStageId}
+                  onFieldChange={handleFieldChange}
+                  onDelete={handleDelete}
+                  onToggleCurrent={handleToggleCurrent}
+                />
               );
             })}
 

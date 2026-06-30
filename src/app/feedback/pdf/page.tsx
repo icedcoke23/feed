@@ -84,7 +84,6 @@ function PDFPreviewPageContent() {
       if (!data.campus || data.campus.trim() === "") {
         data.campus = "南沙万达校区";
       }
-      console.log("[PDF] studentPhotos:", data.studentPhotos);
       setReportData(data);
     } else {
       setNoData(true);
@@ -145,7 +144,6 @@ function PDFPreviewPageContent() {
         status: "completed",
       };
       const bodyStr = JSON.stringify(saveData);
-      console.log('[Save] request body size:', bodyStr.length, 'bytes');
       const response = await fetch("/api/feedbacks", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: bodyStr,
