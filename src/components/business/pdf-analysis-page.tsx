@@ -125,14 +125,14 @@ function EditableBlock({
         <div className="flex justify-between items-center mb-1">
           <h4 className={`font-bold text-base ${borderColorClass.replace('border-', 'text-').replace('-500', '-700')}`}>{label}</h4>
           {editingField !== field && isFirstPage && (
-            <button onClick={() => onStartEditing(field, content)} className="print:hidden opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑">
+            <button onClick={() => onStartEditing(field, content)} className="print:hidden opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑" aria-label="编辑">
               <Pencil className="h-4 w-4" />
             </button>
           )}
         </div>
         {isEditing ? (
           <div className="print:hidden">
-            <textarea value={editValue} onChange={e => onEditValueChange(e.target.value)} className="w-full h-40 text-base p-2 border rounded resize-y" />
+            <textarea value={editValue} onChange={e => onEditValueChange(e.target.value)} aria-label="编辑内容" className="w-full h-40 text-base p-2 border rounded resize-y" />
             <div className="flex gap-2 mt-2">
               <button onClick={onSaveEdit} className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"><Check className="h-3.5 w-3.5" />完成</button>
               <button onClick={onCancelEdit} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-sm hover:bg-gray-300">取消</button>
@@ -205,6 +205,7 @@ function EditableCoursePlanCell({
             onChange={e => onEditValueChange(e.target.value)}
             onBlur={onSaveEdit}
             onKeyDown={handleKeyDown}
+            aria-label="编辑课程规划"
             className="w-full px-1 py-0 border border-blue-400 rounded text-base focus:outline-none focus:ring-1 focus:ring-blue-300 resize-y min-h-[60px]"
           />
           <div className="text-xs text-gray-400 mt-1">Esc 取消 · 失焦保存</div>
@@ -218,6 +219,7 @@ function EditableCoursePlanCell({
         onChange={e => onEditValueChange(e.target.value)}
         onBlur={onSaveEdit}
         onKeyDown={handleKeyDown}
+        aria-label="编辑课程规划"
         className="w-full px-1 py-0 border border-blue-400 rounded text-base focus:outline-none focus:ring-1 focus:ring-blue-300"
       />
     );
@@ -231,6 +233,7 @@ function EditableCoursePlanCell({
           onClick={() => onStartEditing(cellId, value || "")}
           className="print:hidden opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 ml-1 p-0.5 flex-shrink-0"
           title="编辑"
+          aria-label="编辑"
         >
           <Pencil className="h-3 w-3" />
         </button>
@@ -418,7 +421,7 @@ export function PdfAnalysisPage({
                     const stageStatus = plan.status || getStageStatus();
 
                     return (
-                      <tr key={plan.id || index} className={
+                      <tr key={plan.id || `plan-${pageIndex}-${index}-${plan.stage}`} className={
                         stageStatus === 'current' ? 'bg-blue-50' :
                         stageStatus === 'completed' ? 'bg-green-50' : ''
                       }>
@@ -519,12 +522,12 @@ export function PdfAnalysisPage({
                   </span>
                   <div className="flex gap-1 print:hidden">
                     {editingField !== 'summary' && editingField !== 'recommendations' && page.isFirstPage && page.summary && (
-                      <button onClick={() => onStartEditing('summary', reportData.summary)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑总结">
+                      <button onClick={() => onStartEditing('summary', reportData.summary)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑总结" aria-label="编辑总结">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {editingField !== 'recommendations' && editingField !== 'summary' && page.isFirstPage && (
-                      <button onClick={() => onStartEditing('recommendations', reportData.recommendations)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑建议">
+                      <button onClick={() => onStartEditing('recommendations', reportData.recommendations)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="编辑建议" aria-label="编辑建议">
                         <Pencil className="h-4 w-4" />
                       </button>
                     )}
@@ -533,7 +536,7 @@ export function PdfAnalysisPage({
                 {editingField === 'recommendations' && page.isFirstPage ? (
                   <div className="print:hidden">
                     <div className="text-sm text-gray-500 mb-1">编辑建议内容：</div>
-                    <textarea value={editValue} onChange={e => onEditValueChange(e.target.value)} className="w-full h-48 text-base p-2 border rounded resize-y" />
+                    <textarea value={editValue} onChange={e => onEditValueChange(e.target.value)} aria-label="编辑建议内容" className="w-full h-48 text-base p-2 border rounded resize-y" />
                     <div className="flex gap-2 mt-2">
                       <button onClick={onSaveEdit} className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"><Check className="h-3.5 w-3.5" />完成</button>
                       <button onClick={onCancelEdit} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-sm hover:bg-gray-300">取消</button>
@@ -542,7 +545,7 @@ export function PdfAnalysisPage({
                 ) : editingField === 'summary' && page.isFirstPage ? (
                   <div className="print:hidden">
                     <div className="text-sm text-gray-500 mb-1">编辑总结内容：</div>
-                    <textarea value={editValue} onChange={e => onEditValueChange(e.target.value)} className="w-full h-32 text-base p-2 border rounded resize-y" />
+                    <textarea value={editValue} onChange={e => onEditValueChange(e.target.value)} aria-label="编辑总结内容" className="w-full h-32 text-base p-2 border rounded resize-y" />
                     <div className="flex gap-2 mt-2">
                       <button onClick={onSaveEdit} className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"><Check className="h-3.5 w-3.5" />完成</button>
                       <button onClick={onCancelEdit} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-sm hover:bg-gray-300">取消</button>
@@ -575,7 +578,7 @@ export function PdfAnalysisPage({
                         {reportData.studentPhotos.length > 6 && (
                           <span className="text-xs text-gray-400">(共{reportData.studentPhotos.length}张)</span>
                         )}
-                        <button onClick={onOpenPhotoEditor} className="print:hidden text-gray-400 hover:text-blue-500 p-1 ml-auto" title="编辑照片">
+                        <button onClick={onOpenPhotoEditor} className="print:hidden text-gray-400 hover:text-blue-500 p-1 ml-auto" title="编辑照片" aria-label="编辑照片">
                           <Camera className="h-4 w-4" />
                         </button>
                       </div>

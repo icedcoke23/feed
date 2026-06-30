@@ -1,12 +1,9 @@
 import * as repo from "@/lib/repositories/course-prompt-repository";
 import { forbiddenError, notFoundError } from "@/lib/api-error";
 import { successResponse } from "@/lib/api-response";
+import { isAdmin } from "@/lib/services/auth-utils";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { CoursePrompt } from "@/storage/database/shared/schema";
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
 
 export interface CoursePromptResponse {
   id: string;

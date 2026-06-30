@@ -7,6 +7,7 @@ import type { ClassItem, ClassFormData } from "@/types/home";
 import { EMPTY_CLASS_FORM } from "@/types/home";
 import type { ConfirmDialogState } from "@/components/business/confirm-dialog";
 import { INITIAL_CONFIRM_STATE, createConfirmState } from "@/components/business/confirm-dialog";
+import { classFormSchema, firstZodError } from "@/lib/validations/client";
 
 export function useClassActions(
   fetchData: () => Promise<void>,
@@ -42,15 +43,12 @@ export function useClassActions(
   }, []);
 
   const handleAddClass = useCallback(async () => {
-    if (!newClass.name.trim()) {
-      toast.error("请输入班级名称");
+    const parsed = classFormSchema.safeParse(newClass);
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return;
     }
-
-    if (!newClass.teacherId) {
-      toast.error("请选择授课老师");
-      return;
-    }
+    const valid = parsed.data;
 
     setSavingClass(true);
     try {
@@ -59,10 +57,10 @@ export function useClassActions(
         headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({
-          name: newClass.name.trim(),
-          grade: newClass.grade.trim(),
-          schedule: newClass.schedule.trim(),
-          teacherId: newClass.teacherId,
+          name: valid.name,
+          grade: valid.grade,
+          schedule: valid.schedule,
+          teacherId: valid.teacherId,
         }),
       });
       if (response.ok) {
@@ -83,15 +81,17 @@ export function useClassActions(
   }, [newClass, fetchData, getAuthHeaders]);
 
   const handleUpdateClass = useCallback(async () => {
-    if (!editingClass || !newClass.name.trim()) {
-      toast.error("请输入班级名称");
+    if (!editingClass) {
+      toast.error("未选择要编辑的班级");
       return;
     }
 
-    if (!newClass.teacherId) {
-      toast.error("请选择授课老师");
+    const parsed = classFormSchema.safeParse(newClass);
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return;
     }
+    const valid = parsed.data;
 
     setSavingClass(true);
     try {
@@ -100,10 +100,10 @@ export function useClassActions(
         headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({
-          name: newClass.name.trim(),
-          grade: newClass.grade.trim(),
-          schedule: newClass.schedule.trim(),
-          teacherId: newClass.teacherId,
+          name: valid.name,
+          grade: valid.grade,
+          schedule: valid.schedule,
+          teacherId: valid.teacherId,
         }),
       });
       if (response.ok) {

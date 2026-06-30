@@ -5,6 +5,7 @@ import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { sanitizeError } from "@/lib/sensitive-mask";
 import * as studentService from "@/lib/services/student-service";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const studentItemSchema = z.object({
   name: z.string().min(1, "学员姓名不能为空"),
@@ -24,6 +25,10 @@ export async function POST(request: NextRequest) {
   if (!authUser) {
     return errorResponse("未授权访问", 401);
   }
+
+  // 批量添加学员限流：每用户每分钟 5 次
+  const limited = enforceRateLimit(`batch-students:${authUser.userId}`, 5, 60_000);
+  if (limited) return limited;
 
   const body = await request.json();
 

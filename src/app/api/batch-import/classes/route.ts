@@ -5,6 +5,7 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { batchImportClassSchema } from "@/lib/validations/data-import";
 import { sanitizeError } from "@/lib/sensitive-mask";
 import * as batchImportService from "@/lib/services/batch-import-service";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 // POST /api/batch-import/classes - 批量导入班级
 export async function POST(request: NextRequest) {
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
   if (authUser.userRole !== "admin") {
     return forbiddenError("仅管理员可访问");
   }
+
+  // 批量导入限流：每用户每分钟 5 次
+  const limited = enforceRateLimit(`batch-classes:${authUser.userId}`, 5, 60_000);
+  if (limited) return limited;
 
   try {
     const body = await request.json();

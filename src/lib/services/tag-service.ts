@@ -1,20 +1,19 @@
 import * as repo from "@/lib/repositories/tag-repository";
 import { forbiddenError, notFoundError } from "@/lib/api-error";
 import { successResponse } from "@/lib/api-response";
+import { isAdmin } from "@/lib/services/auth-utils";
+import { toSnakeCaseTag } from "@/lib/services/snake-case-mappers";
 import type { AuthUserResult } from "@/lib/route-auth";
 
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
-
 export async function list(user: AuthUserResult, options: repo.ListTagsOptions) {
-  return repo.list(options);
+  const tags = await repo.list(options);
+  return tags.map(toSnakeCaseTag);
 }
 
 export async function findById(user: AuthUserResult, id: string) {
   const tag = await repo.findById(id);
   if (!tag) return notFoundError("标签不存在");
-  return tag;
+  return toSnakeCaseTag(tag);
 }
 
 export async function create(
@@ -24,7 +23,8 @@ export async function create(
   if (!isAdmin(user)) {
     return forbiddenError("权限不足");
   }
-  return repo.create(payload);
+  const tag = await repo.create(payload);
+  return toSnakeCaseTag(tag);
 }
 
 export async function update(
@@ -39,7 +39,7 @@ export async function update(
   if (!existing) return notFoundError("标签不存在");
   const tag = await repo.update(id, payload);
   if (!tag) return notFoundError("标签不存在");
-  return tag;
+  return toSnakeCaseTag(tag);
 }
 
 export async function remove(user: AuthUserResult, id: string) {

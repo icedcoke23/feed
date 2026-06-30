@@ -1,17 +1,14 @@
 import * as repo from "@/lib/repositories/teacher-repository";
 import * as lookupCache from "@/lib/services/lookup-service";
 import { db } from "@/storage/database/drizzle-client";
-import { users } from "@/storage/database/shared/schema";
-import { eq } from "drizzle-orm";
+import { users, teachers } from "@/storage/database/shared/schema";
+import { eq, and, count } from "drizzle-orm";
 import { buildPaginationMeta } from "@/lib/pagination";
-import { forbiddenError } from "@/lib/api-error";
+import { forbiddenError, notFoundError, badRequestError } from "@/lib/api-error";
 import { maskPhone, maskEmail } from "@/lib/sensitive-mask";
+import { isAdmin } from "@/lib/services/auth-utils";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { Teacher } from "@/storage/database/shared/schema";
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
 
 function toResponse(teacher: Teacher) {
   return {
@@ -84,9 +81,32 @@ export async function update(
 export async function remove(user: AuthUserResult, id: string) {
   if (!isAdmin(user)) return forbiddenError("权限不足");
 
+  // 自删检查：防止管理员删除自己的账号导致会话失效
+  if (id === user.userId) {
+    return badRequestError("不能删除当前登录账号");
+  }
+
+  const existing = await repo.findById(id);
+  if (!existing) return notFoundError("教师不存在");
+
+  // 最后一个 admin 教师检查：防止删除最后一个管理员导致系统无法管理
+  if (existing.role === "admin") {
+    const adminCount = await db
+      .select({ value: count() })
+      .from(teachers)
+      .where(and(eq(teachers.role, "admin"), eq(teachers.isActive, true)));
+    if ((adminCount[0]?.value ?? 0) <= 1) {
+      return badRequestError("不能删除最后一个管理员教师");
+    }
+  }
+
+  // 软删除：保留记录但标记为非活跃，便于数据审计与历史关联
   await db.transaction(async (tx) => {
-    await tx.delete(users).where(eq(users.id, id));
-    await repo.remove(id, tx);
+    await tx
+      .update(teachers)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(teachers.id, id));
+    await tx.update(users).set({ isActive: false }).where(eq(users.id, id));
   });
 
   lookupCache.invalidateTeachers();

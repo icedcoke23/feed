@@ -47,14 +47,14 @@ export function StudentSelector({
       <CardContent className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>选择学员</Label>
+            <Label htmlFor="student-selector-student">选择学员</Label>
             {students.length === 0 ? (
               <div className="text-sm text-gray-500 p-3 border rounded-lg bg-gray-50">
                 暂无学员数据，请先添加学员
               </div>
             ) : (
               <Select value={selectedStudentId} onValueChange={onSelectStudent}>
-                <SelectTrigger>
+                <SelectTrigger id="student-selector-student">
                   <SelectValue placeholder="请选择学员" />
                 </SelectTrigger>
                 <SelectContent>
@@ -70,8 +70,8 @@ export function StudentSelector({
             )}
           </div>
           <div className="space-y-2">
-            <Label>反馈日期</Label>
-            <Input type="date" value={feedbackDate} onChange={(e) => onChangeDate(e.target.value)} />
+            <Label htmlFor="student-selector-feedback-date">反馈日期</Label>
+            <Input id="student-selector-feedback-date" type="date" value={feedbackDate} onChange={(e) => onChangeDate(e.target.value)} />
           </div>
         </div>
 

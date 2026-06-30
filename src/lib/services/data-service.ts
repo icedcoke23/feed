@@ -130,32 +130,41 @@ export interface ClearResult {
     tagsDeleted: number;
     courseStagesDeleted: number;
     teachersDeleted: number;
+    orphanUsersDeleted: number;
   };
 }
 
 export async function clearAll(): Promise<ClearResult> {
-  // 按外键依赖顺序分层删除
-  const [feedbacksDeleted, transfersDeleted] = await Promise.all([
-    db.delete(feedbacks).returning(),
-    db.delete(classTransfers).returning(),
-  ]);
+  // 整体包入事务：8 张表删除 + 孤儿 users 清理，任一失败则全部回滚
+  const result = await withTransaction(async (tx) => {
+    // 按外键依赖顺序分层删除
+    const [feedbacksDeleted, transfersDeleted] = await Promise.all([
+      tx.delete(feedbacks).returning(),
+      tx.delete(classTransfers).returning(),
+    ]);
 
-  const studentsDeleted = await db.delete(students).returning();
-  const classesDeleted = await db.delete(classes).returning();
+    const studentsDeleted = await tx.delete(students).returning();
+    const classesDeleted = await tx.delete(classes).returning();
 
-  const [themesDeleted, tagsDeleted, courseStagesDeleted] = await Promise.all([
-    db.delete(teachingThemes).returning(),
-    db.delete(tags).returning(),
-    db.delete(courseStages).returning(),
-  ]);
+    const [themesDeleted, tagsDeleted, courseStagesDeleted] = await Promise.all([
+      tx.delete(teachingThemes).returning(),
+      tx.delete(tags).returning(),
+      tx.delete(courseStages).returning(),
+    ]);
 
-  const teachersDeleted = await db
-    .delete(teachers)
-    .where(eq(teachers.role, "teacher"))
-    .returning();
+    const teachersDeleted = await tx
+      .delete(teachers)
+      .where(eq(teachers.role, "teacher"))
+      .returning();
 
-  return {
-    details: {
+    // 清理孤儿 users：teachers 表删除后，对应的 users 记录（共享 ID）需同步删除，
+    // 避免残留密码哈希与再次导入时的用户名冲突
+    const orphanUsersDeleted = await tx
+      .delete(users)
+      .where(eq(users.role, "teacher"))
+      .returning();
+
+    return {
       feedbacksDeleted: feedbacksDeleted.length,
       transfersDeleted: transfersDeleted.length,
       studentsDeleted: studentsDeleted.length,
@@ -164,8 +173,11 @@ export async function clearAll(): Promise<ClearResult> {
       tagsDeleted: tagsDeleted.length,
       courseStagesDeleted: courseStagesDeleted.length,
       teachersDeleted: teachersDeleted.length,
-    },
-  };
+      orphanUsersDeleted: orphanUsersDeleted.length,
+    };
+  });
+
+  return { details: result };
 }
 
 export type { ImportData, ImportResults } from "@/lib/repositories/data-repository";

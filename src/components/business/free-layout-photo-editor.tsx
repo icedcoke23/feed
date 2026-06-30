@@ -103,7 +103,6 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
 
     // 过滤掉没有有效URL的照片
     const validPhotos = photos.slice(0, 6).filter(p => p.url && p.url.trim());
-    console.log('[PhotoEditor] input photos:', photos.length, 'validPhotos:', validPhotos.length, 'urls:', validPhotos.map(p => ({id: p.id, urlLen: p.url?.length, urlPrefix: p.url?.slice(0, 30)})));
     const count = validPhotos.length;
 
     // 清理已不存在照片的失败记录
@@ -216,7 +215,7 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
       }}
     >
       {layouts.length === 0 && <div className="flex items-center justify-center h-full text-gray-400 text-sm">正在加载照片...</div>}
-      {layouts.map((layout) => {
+      {layouts.map((layout, index) => {
         const zIndex = zIndices[layout.id] || 1;
         const canReset = layout.url !== layout.originalUrl;
         const isHovered = hoveredId === layout.id;
@@ -280,9 +279,8 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={layout.url}
-                  alt="学员照片"
+                  alt={`学员照片 ${index + 1}`}
                   loading="eager"
-                  onLoad={() => console.log('[Photo] loaded:', layout.id)}
                   onError={() => {
                     console.error('[Photo] load failed:', layout.id, layout.url);
                     setFailedImageIds(prev => new Set(prev).add(layout.id));
@@ -303,25 +301,25 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
               {isEditable && (
                 <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/photo:opacity-100 transition-opacity print:hidden" style={{ zIndex: 5 }}>
                   {onPhotoCrop && (
-                    <button onClick={(e) => { e.stopPropagation(); onPhotoCrop(layout.id, layout.url); }} className="h-7 w-7 flex items-center justify-center rounded bg-green-500 text-white hover:bg-green-600 shadow-sm" title="裁剪">
+                    <button onClick={(e) => { e.stopPropagation(); onPhotoCrop(layout.id, layout.url); }} className="h-7 w-7 flex items-center justify-center rounded bg-green-500 text-white hover:bg-green-600 shadow-sm" title="裁剪" aria-label="裁剪">
                       <Crop className="h-3.5 w-3.5" />
                     </button>
                   )}
                   {canReset && (
-                    <button onClick={(e) => resetPhoto(layout.id, e)} className="h-7 w-7 flex items-center justify-center rounded bg-amber-500 text-white hover:bg-amber-600 shadow-sm" title="恢复原图">
+                    <button onClick={(e) => resetPhoto(layout.id, e)} className="h-7 w-7 flex items-center justify-center rounded bg-amber-500 text-white hover:bg-amber-600 shadow-sm" title="恢复原图" aria-label="恢复原图">
                       <RotateCcw className="h-3.5 w-3.5" />
                     </button>
                   )}
                   {onPhotoReplace && (
                     <>
-                      <input type="file" accept="image/*" onChange={(e) => { e.stopPropagation(); onPhotoReplace(layout.id, e); }} className="hidden" id={`free-replace-${layout.id}`} />
-                      <button onClick={(e) => { e.stopPropagation(); document.getElementById(`free-replace-${layout.id}`)?.click(); }} className="h-7 w-7 flex items-center justify-center rounded bg-blue-500 text-white hover:bg-blue-600 shadow-sm" title="替换">
+                      <input type="file" accept="image/*" onChange={(e) => { e.stopPropagation(); onPhotoReplace(layout.id, e); }} aria-label="替换照片" className="hidden" id={`free-replace-${layout.id}`} />
+                      <button onClick={(e) => { e.stopPropagation(); document.getElementById(`free-replace-${layout.id}`)?.click(); }} className="h-7 w-7 flex items-center justify-center rounded bg-blue-500 text-white hover:bg-blue-600 shadow-sm" title="替换" aria-label="替换">
                         <Replace className="h-3.5 w-3.5" />
                       </button>
                     </>
                   )}
                   {onPhotoDelete && (
-                    <button onClick={(e) => { e.stopPropagation(); onPhotoDelete(layout.id); }} className="h-7 w-7 flex items-center justify-center rounded bg-red-500 text-white hover:bg-red-600 shadow-sm" title="删除">
+                    <button onClick={(e) => { e.stopPropagation(); onPhotoDelete(layout.id); }} className="h-7 w-7 flex items-center justify-center rounded bg-red-500 text-white hover:bg-red-600 shadow-sm" title="删除" aria-label="删除">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   )}
@@ -331,8 +329,8 @@ export function FreeLayoutPhotoEditor({ photos, onPhotoEdit, onPhotoDelete, onPh
               {/* 图层控制按钮 */}
               {isEditable && hoveredId === layout.id && (
                 <div className="absolute top-1 left-1 flex flex-col gap-1 print:hidden" style={{ zIndex: 5 }}>
-                  <button onClick={(e) => { e.stopPropagation(); bringToFront(layout.id); }} className="h-6 w-6 flex items-center justify-center rounded bg-purple-500 text-white hover:bg-purple-600 shadow-sm text-xs font-bold" title="置顶">↑</button>
-                  <button onClick={(e) => { e.stopPropagation(); sendToBack(layout.id); }} className="h-6 w-6 flex items-center justify-center rounded bg-purple-400 text-white hover:bg-purple-500 shadow-sm text-xs font-bold" title="置底">↓</button>
+                  <button onClick={(e) => { e.stopPropagation(); bringToFront(layout.id); }} className="h-6 w-6 flex items-center justify-center rounded bg-purple-500 text-white hover:bg-purple-600 shadow-sm text-xs font-bold" title="置顶" aria-label="置顶">↑</button>
+                  <button onClick={(e) => { e.stopPropagation(); sendToBack(layout.id); }} className="h-6 w-6 flex items-center justify-center rounded bg-purple-400 text-white hover:bg-purple-500 shadow-sm text-xs font-bold" title="置底" aria-label="置底">↓</button>
                 </div>
               )}
 

@@ -7,7 +7,6 @@ import {
   timestamp,
   boolean,
   integer,
-  smallint,
   jsonb,
   index,
   uniqueIndex,
@@ -39,7 +38,13 @@ export const teachers = pgTable(
       .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
   },
-  (table) => [index("teachers_email_idx").on(table.email)]
+  (table) => [
+    index("teachers_email_idx").on(table.email),
+    // 部分索引：仅活跃教师的 role 查询
+    index("teachers_active_role_idx")
+      .on(table.role)
+      .where(sql`${table.isActive} = true`),
+  ]
 );
 
 // 学生表
@@ -76,6 +81,12 @@ export const students = pgTable(
     index("students_name_idx").on(table.name),
     index("students_class_idx").on(table.classId),
     index("students_admin_teacher_idx").on(table.adminTeacherId),
+    // 复合索引：教务老师按时间查询学生
+    index("students_admin_created_idx").on(table.adminTeacherId, table.createdAt),
+    // 部分索引：仅活跃学生按名查询
+    index("students_active_name_idx")
+      .on(table.name)
+      .where(sql`${table.isActive} = true`),
   ]
 );
 
@@ -92,18 +103,18 @@ export const feedbacks = pgTable(
     teacherId: varchar("teacher_id", { length: 36 })
       .notNull()
       .references(() => teachers.id, { onDelete: "restrict" }),
-    
+
     // 学情分析
     strengths: jsonb("strengths").default([]), // 优点标签和描述
     improvements: jsonb("improvements").default([]), // 能力提升
     weaknesses: jsonb("weaknesses").default([]), // 需要提升的点
-    
+
     // 教学计划
     teachingPlan: jsonb("teaching_plan").default([]), // 教学计划表格数据
-    
+
     // 阶段性建议
     suggestions: text("suggestions"), // 阶段性建议
-    
+
     // AI生成的报告内容（纯文本）
     aiReport: text("ai_report"), // AI生成的完整报告
 
@@ -121,10 +132,10 @@ export const feedbacks = pgTable(
       (): AnyPgColumn => feedbacks.id,
       { onDelete: "set null" }
     ), // 父版本ID
-    
+
     // 状态
     status: varchar("status", { length: 20 }).default("draft").notNull(), // draft, published
-    
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -136,6 +147,18 @@ export const feedbacks = pgTable(
     index("feedbacks_student_idx").on(table.studentId),
     index("feedbacks_teacher_idx").on(table.teacherId),
     index("feedbacks_created_idx").on(table.createdAt),
+    // 关键索引：按状态过滤（Phase 2.4）
+    index("feedbacks_status_idx").on(table.status),
+    // 关键索引：按时间区间查询（Phase 2.4）
+    index("feedbacks_period_idx").on(table.periodStart, table.periodEnd),
+    // 复合索引：学生/教师按时间倒序查询反馈
+    index("feedbacks_student_created_idx").on(table.studentId, table.createdAt),
+    index("feedbacks_teacher_created_idx").on(table.teacherId, table.createdAt),
+    // 复合索引：状态 + 时间倒序，统计/筛选常用
+    index("feedbacks_status_created_idx").on(table.status, table.createdAt),
+    // GIN 索引：JSONB 字段查询
+    index("feedbacks_metadata_gin_idx").using("gin", table.metadata),
+    index("feedbacks_work_info_gin_idx").using("gin", table.workInfo),
   ]
 );
 
@@ -165,63 +188,12 @@ export const studentClasses = pgTable(
   (table) => [
     index("student_classes_student_idx").on(table.studentId),
     index("student_classes_class_idx").on(table.classId),
+    // 复合索引：学生 + 活跃状态查询
+    index("student_classes_student_active_idx").on(table.studentId, table.isActive),
+    // 部分唯一索引：每个学生最多一个主班级
     uniqueIndex("student_classes_primary_idx")
       .on(table.studentId)
       .where(sql`${table.isPrimary} = true`),
-  ]
-);
-
-// 反馈项目表（拆分 feedbacks.strengths / improvements / weaknesses）
-export const feedbackItems = pgTable(
-  "feedback_items",
-  {
-    id: varchar("id", { length: 36 })
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    feedbackId: varchar("feedback_id", { length: 36 })
-      .notNull()
-      .references(() => feedbacks.id, { onDelete: "cascade" }),
-    tagId: varchar("tag_id", { length: 36 }).references(() => tags.id, {
-      onDelete: "set null",
-    }),
-    category: varchar("category", { length: 20 }).notNull(),
-    name: varchar("name", { length: 100 }).notNull(),
-    description: text("description"),
-    rating: smallint("rating"),
-    sortOrder: integer("sort_order").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("feedback_items_feedback_id_idx").on(table.feedbackId),
-    index("feedback_items_tag_id_idx").on(table.tagId),
-    index("feedback_items_category_idx").on(table.category),
-  ]
-);
-
-// 能力评分表（拆分 feedbacks.ability_scores）
-export const feedbackAbilityScores = pgTable(
-  "feedback_ability_scores",
-  {
-    id: varchar("id", { length: 36 })
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    feedbackId: varchar("feedback_id", { length: 36 })
-      .notNull()
-      .references(() => feedbacks.id, { onDelete: "cascade" }),
-    abilityName: varchar("ability_name", { length: 100 }).notNull(),
-    score: smallint("score").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("feedback_ability_scores_feedback_id_idx").on(table.feedbackId),
-    uniqueIndex("feedback_ability_scores_unique_idx").on(
-      table.feedbackId,
-      table.abilityName
-    ),
   ]
 );
 
@@ -252,6 +224,8 @@ export const classTransfers = pgTable(
   (table) => [
     index("transfers_student_idx").on(table.studentId),
     index("transfers_date_idx").on(table.transferredAt),
+    // 复合索引：学生 + 时间倒序查询转班历史
+    index("transfers_student_transferred_idx").on(table.studentId, table.transferredAt),
   ]
 );
 
@@ -314,6 +288,10 @@ export const courseStages = pgTable(
   (table) => [
     index("course_stages_theme_idx").on(table.theme),
     index("course_stages_level_idx").on(table.level),
+    // 部分索引：仅活跃课程阶段按主题+级别查询
+    index("course_stages_active_theme_level_idx")
+      .on(table.theme, table.level)
+      .where(sql`${table.isActive} = true`),
   ]
 );
 
@@ -342,6 +320,12 @@ export const classes = pgTable(
   },
   (table) => [
     index("classes_teacher_idx").on(table.teacherId),
+    // 复合索引：按名 + 教师查询
+    index("classes_name_teacher_idx").on(table.name, table.teacherId),
+    // 部分索引：仅活跃班级按教师查询
+    index("classes_active_teacher_idx")
+      .on(table.teacherId)
+      .where(sql`${table.isActive} = true`),
   ]
 );
 
@@ -509,5 +493,3 @@ export type InsertAiSetting = z.infer<typeof insertAiSettingSchema>;
 export type CoursePrompt = typeof coursePrompts.$inferSelect;
 
 export type StudentClass = typeof studentClasses.$inferSelect;
-export type FeedbackItem = typeof feedbackItems.$inferSelect;
-export type FeedbackAbilityScore = typeof feedbackAbilityScores.$inferSelect;

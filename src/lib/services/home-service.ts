@@ -5,6 +5,7 @@ import {
   teachers,
   studentClasses,
 } from "@/storage/database/shared/schema";
+import { maskPhone, maskEmail } from "@/lib/sensitive-mask";
 import {
   eq,
   inArray,
@@ -17,11 +18,8 @@ import {
 import * as authService from "@/lib/services/auth-service";
 import { buildPaginationMeta } from "@/lib/pagination";
 import { forbiddenError } from "@/lib/api-error";
+import { isAdmin } from "@/lib/services/auth-utils";
 import type { AuthUserResult } from "@/lib/route-auth";
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
 
 export interface HomeDataQuery {
   page: number;
@@ -106,12 +104,20 @@ export async function getHomeData(
   // 为班级补充教师信息
   const classesWithTeacher = await enrichClasses(classesData);
 
+  // 敏感数据脱敏：所有登录用户（含普通教师）不应看到完整手机号/邮箱
+  const maskTeacher = (t: { id: string; name: string; phone: string | null; email?: string | null }) => ({
+    id: t.id,
+    name: t.name,
+    phone: maskPhone(t.phone),
+    email: t.email !== undefined ? maskEmail(t.email) : undefined,
+  });
+
   return {
     students: enrichedStudents,
     studentsPagination: buildPaginationMeta(query.page, query.limit, studentsTotal[0]?.value ?? 0),
     classes: classesWithTeacher,
-    teachers: teachersData,
-    adminTeachers: adminTeachersData,
+    teachers: teachersData.map(maskTeacher),
+    adminTeachers: adminTeachersData.map(maskTeacher),
   };
 }
 
@@ -146,7 +152,23 @@ async function enrichStudents(studentsData: typeof students.$inferSelect[]) {
   ]);
 
   const classesMap = new Map(classesInfo.map((c) => [c.id, c]));
-  const teachersMap = new Map(adminTeachersInfo.map((t) => [t.id, t]));
+
+  // 补查班级教师：classesInfo 中的 teacherId 对应的教师不在 adminTeachersInfo 中，
+  // 需额外查询并合并到 teachersMap，否则班级教师字段静默为 null。
+  const classTeacherIds = [
+    ...new Set(classesInfo.map((c) => c.teacherId).filter(Boolean)),
+  ] as string[];
+  const classTeachersInfo =
+    classTeacherIds.length > 0
+      ? await db
+          .select({ id: teachers.id, name: teachers.name, phone: teachers.phone })
+          .from(teachers)
+          .where(inArray(teachers.id, classTeacherIds))
+      : [];
+  const teachersMap = new Map([
+    ...adminTeachersInfo.map((t) => [t.id, t] as const),
+    ...classTeachersInfo.map((t) => [t.id, t] as const),
+  ]);
   const relationsByStudent = new Map<string, typeof studentClassRelations>();
   studentClassRelations.forEach((rel) => {
     if (!relationsByStudent.has(rel.studentId)) relationsByStudent.set(rel.studentId, []);
@@ -167,7 +189,7 @@ async function enrichStudents(studentsData: typeof students.$inferSelect[]) {
           schedule: cls.schedule,
           teacher_id: cls.teacherId,
           is_primary: r.isPrimary,
-          teacher: teacher ? { id: teacher.id, name: teacher.name, phone: teacher.phone } : null,
+          teacher: teacher ? { id: teacher.id, name: teacher.name, phone: maskPhone(teacher.phone) } : null,
         };
       })
       .filter(Boolean);
@@ -181,7 +203,7 @@ async function enrichStudents(studentsData: typeof students.$inferSelect[]) {
       name: s.name,
       grade: s.grade,
       school: s.school,
-      phone: s.phone,
+      phone: maskPhone(s.phone),
       current_class: s.currentClass,
       class_id: primaryClass?.id || s.classId,
       current_teacher_id: s.currentTeacherId,
@@ -196,12 +218,15 @@ async function enrichStudents(studentsData: typeof students.$inferSelect[]) {
             grade: primaryClass.grade,
             schedule: primaryClass.schedule,
             teacher_id: primaryClass.teacherId,
-            teacher: primaryTeacher ? { id: primaryTeacher.id, name: primaryTeacher.name, phone: primaryTeacher.phone } : null,
+            teacher: primaryTeacher ? { id: primaryTeacher.id, name: primaryTeacher.name, phone: maskPhone(primaryTeacher.phone) } : null,
           }
         : null,
       classes: classList,
       admin_teacher: s.adminTeacherId
-        ? teachersMap.get(s.adminTeacherId) || null
+        ? (() => {
+            const t = teachersMap.get(s.adminTeacherId);
+            return t ? { id: t.id, name: t.name, phone: maskPhone(t.phone) } : null;
+          })()
         : null,
     };
   });
@@ -229,6 +254,11 @@ async function enrichClasses(classesData: typeof classes.$inferSelect[]) {
     is_active: c.isActive,
     created_at: c.createdAt,
     updated_at: c.updatedAt,
-    teacher: c.teacherId ? teacherMap.get(c.teacherId) || null : null,
+    teacher: c.teacherId
+      ? (() => {
+          const t = teacherMap.get(c.teacherId);
+          return t ? { id: t.id, name: t.name, phone: maskPhone(t.phone) } : null;
+        })()
+      : null,
   }));
 }

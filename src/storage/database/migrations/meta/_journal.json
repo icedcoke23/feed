@@ -8,6 +8,13 @@
       "when": 1781935667800,
       "tag": "0000_equal_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782831112513,
+      "tag": "0001_chubby_saracen",
+      "breakpoints": true
     }
   ]
 }

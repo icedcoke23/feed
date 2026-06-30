@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/route-auth";
 import { validateInput } from "@/lib/validations";
 import { handleDbError } from "@/lib/api-error";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 import * as authService from "@/lib/services/auth-service";
 
@@ -17,6 +18,10 @@ export async function POST(request: NextRequest) {
   if (!authUser) {
     return errorResponse("未授权访问", 401);
   }
+
+  // 修改密码限流：每用户每分钟 5 次
+  const limited = enforceRateLimit(`change-password:${authUser.userId}`, 5, 60_000);
+  if (limited) return limited;
 
   const body = await request.json();
   const result = validateInput(changePasswordSchema, body);

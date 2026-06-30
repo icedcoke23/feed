@@ -1,16 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/storage/database/drizzle-client";
-import { users, teachers } from "@/storage/database/shared/schema";
-import { eq, and } from "drizzle-orm";
+import { NextRequest } from "next/server";
 import {
-  signToken,
-  comparePassword,
-  isBcryptHash,
   COOKIE_NAME,
+  signToken,
 } from "@/lib/auth";
 import { validateInput } from "@/lib/validations";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { enforceRateLimit, getClientIp } from "@/lib/rate-limit";
 import { sanitizeError } from "@/lib/sensitive-mask";
+import { authService } from "@/lib/services";
+import { successResponse, errorResponse } from "@/lib/api-response";
+import { apiError } from "@/lib/api-error";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -20,98 +18,38 @@ const loginSchema = z.object({
 
 // POST /api/auth/login - 用户登录
 export async function POST(request: NextRequest) {
-  // 登录限流：每 IP 每分钟最多 5 次请求
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
-  const { allowed, retryAfterMs } = checkRateLimit(`login:${ip}`, 5, 60_000);
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "请求过于频繁，请稍后再试", code: "RATE_LIMITED", retryAfter: retryAfterMs / 1000 },
-      { status: 429 }
-    );
-  }
+  // 登录限流：每 IP 每分钟最多 5 次请求（防爆破）
+  const limited = enforceRateLimit(`login:${getClientIp(request)}`, 5, 60_000);
+  if (limited) return limited;
 
   const body = await request.json();
 
   // 校验输入
   if (!body || typeof body !== "object" || !("username" in body) || !("password" in body)) {
-    return NextResponse.json(
-      { error: "请求参数错误", code: "VALIDATION_ERROR" },
-      { status: 400 }
-    );
+    return errorResponse("请求参数错误", 400, "VALIDATION_ERROR");
   }
   const result = validateInput(loginSchema, body);
   if ("error" in result) return result.error;
   const { username, password } = result.data;
 
   try {
-    // 通过 username 查找用户（不再用密码匹配查询）
-    const rows = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.username, username), eq(users.isActive, true)))
-      .limit(1);
-    const user = rows[0];
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "用户名或密码错误", code: "INVALID_CREDENTIALS" },
-        { status: 401 }
-      );
-    }
-
-    // 密码不是 bcrypt 哈希格式，拒绝登录
-    if (!isBcryptHash(user.password)) {
-      return NextResponse.json(
-        { error: "密码格式已过期，请联系管理员重置密码", code: "PASSWORD_FORMAT_EXPIRED" },
-        { status: 401 }
-      );
-    }
-
-    // 验证密码
-    const isPasswordValid = await comparePassword(password, user.password);
-
-    if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: "用户名或密码错误", code: "INVALID_CREDENTIALS" },
-        { status: 401 }
-      );
+    const loginResult = await authService.login({ username, password });
+    // service 返回 Response 表示鉴权失败（已含统一错误格式）
+    if (loginResult instanceof Response) {
+      return loginResult;
     }
 
     // 签发 JWT Token
     const token = await signToken({
-      userId: user.id,
-      role: user.role as "admin" | "teacher",
+      userId: loginResult.user.id,
+      role: loginResult.user.role as "admin" | "teacher",
     });
 
-    // 构造不含密码的用户信息
-    const userInfo: Record<string, unknown> = {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      role: user.role,
-      phone: user.phone,
-    };
-
-    // 如果是 teacher 角色，关联查询 teachers 表获取 role
-    if (user.role === "teacher") {
-      const teacherRows = await db
-        .select({ role: teachers.role })
-        .from(teachers)
-        .where(eq(teachers.id, user.id))
-        .limit(1);
-      if (teacherRows[0]) {
-        userInfo.teacherRole = teacherRows[0].role;
-      }
-    }
-
-    // 将 Token 设置到 httpOnly Cookie 中
-    const response = NextResponse.json({
-      data: userInfo,
-      message: "登录成功",
-    });
+    // 统一返回 { data: { user } } 结构，与 auth-context 的 data.user 对齐
+    const response = successResponse(
+      { user: loginResult.user },
+      "登录成功"
+    );
 
     response.cookies.set(COOKIE_NAME, token, {
       httpOnly: true,
@@ -124,9 +62,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Login error:", sanitizeError(error));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError("登录失败，请稍后重试");
   }
 }

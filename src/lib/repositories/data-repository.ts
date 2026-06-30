@@ -290,7 +290,8 @@ async function inferLegacyTeachersFromClasses(
 async function importCourseStages(
   tx: Tx,
   data: ImportData,
-  results: ImportResults
+  results: ImportResults,
+  errors: string[]
 ): Promise<void> {
   const list = data.courseStages || [];
   if (list.length === 0) return;
@@ -327,8 +328,11 @@ async function importCourseStages(
           },
         });
       results.courseStages.success++;
-    } catch {
+    } catch (error) {
       results.courseStages.failed++;
+      const msg = `课程阶段导入失败 (id=${(stageData.id as string) || "未知"}, code=${(stageData.stage_code as string) || "未知"}): ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(msg);
+      console.error(`[data-repository] ${msg}`);
     }
   }
 }
@@ -336,7 +340,8 @@ async function importCourseStages(
 async function importThemes(
   tx: Tx,
   data: ImportData,
-  results: ImportResults
+  results: ImportResults,
+  errors: string[]
 ): Promise<void> {
   const list = data.themes || [];
   if (list.length === 0) return;
@@ -365,8 +370,11 @@ async function importThemes(
           },
         });
       results.themes.success++;
-    } catch {
+    } catch (error) {
       results.themes.failed++;
+      const msg = `教学主题导入失败 (id=${(themeData.id as string) || "未知"}, name=${(themeData.name as string) || "未知"}): ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(msg);
+      console.error(`[data-repository] ${msg}`);
     }
   }
 }
@@ -374,7 +382,8 @@ async function importThemes(
 async function importTags(
   tx: Tx,
   data: ImportData,
-  results: ImportResults
+  results: ImportResults,
+  errors: string[]
 ): Promise<void> {
   const list = data.tags || [];
   if (list.length === 0) return;
@@ -403,8 +412,11 @@ async function importTags(
           },
         });
       results.tags.success++;
-    } catch {
+    } catch (error) {
       results.tags.failed++;
+      const msg = `标签导入失败 (id=${(tagData.id as string) || "未知"}, name=${(tagData.name as string) || "未知"}): ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(msg);
+      console.error(`[data-repository] ${msg}`);
     }
   }
 }
@@ -414,7 +426,8 @@ async function importClasses(
   data: ImportData,
   teacherMapping: Record<string, string>,
   options: ImportOptions,
-  results: ImportResults
+  results: ImportResults,
+  errors: string[]
 ): Promise<{ classMapping: Record<string, string>; classTeacherMapping: Record<string, string> }> {
   const classMapping: Record<string, string> = {};
   const classTeacherMapping: Record<string, string> = {};
@@ -456,6 +469,7 @@ async function importClasses(
 
     if (!teacherId) {
       results.classes.failed++;
+      errors.push(`班级导入失败 (id=${oldId || "未知"}, name=${clsName || "未知"}): 未关联到教师`);
       continue;
     }
 
@@ -472,8 +486,11 @@ async function importClasses(
       classMapping[oldId] = newId;
       classTeacherMapping[newId] = teacherId;
       results.classes.success++;
-    } catch {
+    } catch (error) {
       results.classes.failed++;
+      const msg = `班级导入失败 (id=${oldId || "未知"}, name=${clsName || "未知"}): ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(msg);
+      console.error(`[data-repository] ${msg}`);
     }
   }
 
@@ -488,7 +505,8 @@ async function importStudents(
   teacherMapping: Record<string, string>,
   adminTeachers: AdminTeacherInfo,
   options: ImportOptions,
-  results: ImportResults
+  results: ImportResults,
+  errors: string[]
 ): Promise<void> {
   const studentList = data.students || [];
   if (studentList.length === 0) return;
@@ -508,6 +526,7 @@ async function importStudents(
 
     if (!newClassId) {
       results.students.failed++;
+      errors.push(`学员导入失败 (id=${oldId || "未知"}, name=${studentName || "未知"}): 未找到映射班级 class_id=${oldClassId || "空"}`);
       continue;
     }
 
@@ -542,8 +561,11 @@ async function importStudents(
         isActive: (studentData.is_active as boolean) ?? true,
       });
       results.students.success++;
-    } catch {
+    } catch (error) {
       results.students.failed++;
+      const msg = `学员导入失败 (id=${oldId || "未知"}, name=${studentName || "未知"}): ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(msg);
+      console.error(`[data-repository] ${msg}`);
     }
   }
 }
@@ -552,7 +574,8 @@ async function importFeedbacks(
   tx: Tx,
   data: ImportData,
   results: ImportResults,
-  options: ImportOptions
+  options: ImportOptions,
+  errors: string[]
 ): Promise<void> {
   const feedbackList = data.feedbacks || [];
   if (feedbackList.length === 0) return;
@@ -584,8 +607,11 @@ async function importFeedbacks(
         periodEnd: feedbackData.period_end ? new Date(feedbackData.period_end as string) : null,
       });
       results.feedbacks.success++;
-    } catch {
+    } catch (error) {
       results.feedbacks.failed++;
+      const msg = `反馈导入失败 (id=${(feedbackData.id as string) || "未知"}, student_id=${(feedbackData.student_id as string) || "未知"}): ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(msg);
+      console.error(`[data-repository] ${msg}`);
     }
   }
 }
@@ -594,7 +620,8 @@ async function importClassTransfers(
   tx: Tx,
   data: ImportData,
   results: ImportResults,
-  options: ImportOptions
+  options: ImportOptions,
+  errors: string[]
 ): Promise<void> {
   const transferList = data.classTransfers || [];
   if (transferList.length === 0) return;
@@ -617,8 +644,11 @@ async function importClassTransfers(
           : new Date(),
       });
       results.classTransfers.success++;
-    } catch {
+    } catch (error) {
       results.classTransfers.failed++;
+      const msg = `转班记录导入失败 (id=${(transferData.id as string) || "未知"}, student_id=${(transferData.student_id as string) || "未知"}): ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(msg);
+      console.error(`[data-repository] ${msg}`);
     }
   }
 }
@@ -661,13 +691,13 @@ export async function importData(
       `✓ 教师处理完成: 成功 ${results.teachers.success}, 跳过 ${results.teachers.skipped}, 失败 ${results.teachers.failed}`
     );
 
-    await importCourseStages(tx, data, results);
+    await importCourseStages(tx, data, results, errors);
     logs.push(`✓ 课程阶段: 成功 ${results.courseStages.success}, 失败 ${results.courseStages.failed}`);
 
-    await importThemes(tx, data, results);
+    await importThemes(tx, data, results, errors);
     logs.push(`✓ 教学主题: 成功 ${results.themes.success}, 失败 ${results.themes.failed}`);
 
-    await importTags(tx, data, results);
+    await importTags(tx, data, results, errors);
     logs.push(`✓ 标签: 成功 ${results.tags.success}, 失败 ${results.tags.failed}`);
 
     const { classMapping, classTeacherMapping } = await importClasses(
@@ -675,7 +705,8 @@ export async function importData(
       data,
       teacherMapping,
       options,
-      results
+      results,
+      errors
     );
     logs.push(`✓ 班级: 成功 ${results.classes.success}, 失败 ${results.classes.failed}`);
 
@@ -687,14 +718,15 @@ export async function importData(
       teacherMapping,
       adminTeachers,
       options,
-      results
+      results,
+      errors
     );
     logs.push(`✓ 学员: 成功 ${results.students.success}, 失败 ${results.students.failed}`);
 
-    await importFeedbacks(tx, data, results, options);
+    await importFeedbacks(tx, data, results, options, errors);
     logs.push(`✓ 反馈记录: 成功 ${results.feedbacks.success}, 失败 ${results.feedbacks.failed}`);
 
-    await importClassTransfers(tx, data, results, options);
+    await importClassTransfers(tx, data, results, options, errors);
     logs.push(`✓ 转班记录: 成功 ${results.classTransfers.success}, 失败 ${results.classTransfers.failed}`);
 
     return { results, logs, errors, format: newFormat ? "new" : "legacy" };

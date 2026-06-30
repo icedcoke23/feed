@@ -9,26 +9,10 @@ import {
   notFoundError,
   badRequestError,
 } from "@/lib/api-error";
-import { maskPhone } from "@/lib/sensitive-mask";
+import { isAdmin } from "@/lib/services/auth-utils";
+import { toSnakeCaseUser } from "@/lib/services/snake-case-mappers";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { User } from "@/storage/database/shared/schema";
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin";
-}
-
-function toSnakeCaseUser(user: User & { teacherRole?: "admin" | "teacher" }) {
-  return {
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    role: user.role,
-    phone: maskPhone(user.phone),
-    is_active: user.isActive,
-    created_at: user.createdAt,
-    teacherRole: user.teacherRole,
-  };
-}
 
 async function enrichUsers(
   rows: User[]

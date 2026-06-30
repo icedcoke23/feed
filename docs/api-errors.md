@@ -19,14 +19,13 @@
 
 ```json
 {
-  "success": false,
   "error": "人类可读的错误描述",
   "code": "ERROR_CODE",
-  "status": 400
+  "details": "可选的附加信息（如校验字段明细）"
 }
 ```
 
-由 `src/lib/api-error.ts` 与 `src/lib/api-response.ts` 中的 `errorResponse` / `apiError` 生成。实际响应体包含 `error` 和可选的 `code`，HTTP 状态码由 `status` 体现。
+由 `src/lib/api-error.ts` 与 `src/lib/api-response.ts` 中的 `errorResponse` / `apiError` 生成。响应体包含 `error` 和可选的 `code`、`details`；HTTP 状态码通过响应状态体现，不在 body 中重复。
 
 ## 错误码说明
 
@@ -37,14 +36,15 @@
 | `VALIDATION_ERROR`        | 400       | 请求参数校验失败   | Zod 校验失败，响应中可能附带 `details` 字段 |
 | `NOT_FOUND`               | 404       | 资源未找到         | 查询的用户/班级/学生不存在                  |
 | `INTERNAL_ERROR`          | 500       | 服务器内部错误     | 未捕获的异常                                |
-| `RATE_LIMITED`            | 429       | 请求过于频繁       | 登录接口同一 IP 多次失败后被限流            |
+| `RATE_LIMITED`            | 429       | 请求过于频繁       | 登录、AI 生成、数据导入、批量操作等接口触发限流，响应附带 `Retry-After` 头 |
 | `BAD_REQUEST`             | 400       | 请求参数错误       | 通用参数错误                                |
 | `INVALID_CREDENTIALS`     | 401       | 用户名或密码错误   | 登录接口                                    |
 | `PASSWORD_FORMAT_EXPIRED` | 401       | 密码格式已过期     | 旧密码未使用 bcrypt 哈希                    |
 | `INVALID_PASSWORD`        | 400       | 旧密码错误         | 修改密码接口                                |
-| `UNIQUE_VIOLATION`        | 409       | 记录已存在         | PostgreSQL 唯一约束冲突（code 23505）       |
+| `UNIQUE_VIOLATION`        | 409       | 记录已存在         | PostgreSQL 唯一约束冲突（code 23505 / 23P01） |
 | `FOREIGN_KEY_VIOLATION`   | 400       | 关联记录不存在     | PostgreSQL 外键约束冲突（code 23503）       |
 | `CHECK_VIOLATION`         | 400       | 数据不满足约束     | PostgreSQL check 约束冲突（code 23514）     |
+| `NOT_NULL_VIOLATION`      | 400       | 必填字段缺失       | PostgreSQL 非空约束冲突（code 23502）       |
 
 ## 响应辅助函数
 

@@ -7,6 +7,7 @@ import { eq, inArray, and, or, isNull } from "drizzle-orm";
 import * as repo from "@/lib/repositories/feedback-repository";
 import * as studentRepo from "@/lib/repositories/student-repository";
 import * as authService from "@/lib/services/auth-service";
+import { clearStatsCache } from "@/lib/services/stats-service";
 import { buildPaginationMeta } from "@/lib/pagination";
 import {
   forbiddenError,
@@ -14,12 +15,13 @@ import {
   badRequestError,
 } from "@/lib/api-error";
 import { extractLegacyMetadata } from "@/utils/ai-report";
+import { isAdmin } from "@/lib/services/auth-utils";
+import { toSnakeCaseFeedback } from "@/lib/services/snake-case-mappers";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { InsertFeedback, Feedback } from "@/storage/database/shared/schema";
 
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
+// 重新导出，保持 `import { toSnakeCaseFeedback } from "@/lib/services/feedback-service"` 兼容
+export { toSnakeCaseFeedback };
 
 function isStaffTeacher(user: AuthUserResult) {
   return user.userRole === "teacher" && user.teacherRole === "admin";
@@ -333,7 +335,7 @@ export async function list(user: AuthUserResult, query: ListFeedbacksQuery) {
 
   const result = await repo.list(options);
   return {
-    data: result.data,
+    data: result.data.map(toSnakeCaseFeedback),
     pagination: buildPaginationMeta(query.page, query.limit, result.count),
   };
 }
@@ -345,7 +347,7 @@ export async function findById(user: AuthUserResult, id: string) {
   const allowed = await canAccessFeedback(user, feedback);
   if (!allowed) return forbiddenError("权限不足");
 
-  return feedback;
+  return toSnakeCaseFeedback(feedback);
 }
 
 export async function create(user: AuthUserResult, input: CreateFeedbackInput) {
@@ -368,7 +370,9 @@ export async function create(user: AuthUserResult, input: CreateFeedbackInput) {
   }
 
   const payload = buildCreatePayload(input, studentId, user.userId);
-  return repo.create(payload);
+  const result = await repo.create(payload);
+  clearStatsCache();
+  return toSnakeCaseFeedback(result);
 }
 
 export async function update(
@@ -383,6 +387,7 @@ export async function update(
   if (!allowed) return forbiddenError("权限不足");
 
   const result = await db.transaction(async (tx) => {
+    // 事务内重新读取版本号，避免读后写竞态
     const rows = await tx
       .select({ version: feedbacks.version })
       .from(feedbacks)
@@ -396,16 +401,25 @@ export async function update(
       existing.metadata as Record<string, unknown> | null,
       current.version + 1
     );
+
+    // 乐观锁：WHERE 条件包含 version 校验。
+    // 若并发请求已修改该行，version 不匹配，update 命中 0 行，
+    // 事务回滚并提示用户刷新后重试，防止"最后写入获胜"覆盖。
     const updated = await tx
       .update(feedbacks)
       .set(payload)
-      .where(eq(feedbacks.id, id))
+      .where(and(eq(feedbacks.id, id), eq(feedbacks.version, current.version)))
       .returning();
+
+    if (updated.length === 0) {
+      return badRequestError("反馈已被其他操作修改，请刷新后重试");
+    }
     return updated[0];
   });
 
   if (result instanceof Response) return result;
-  return result;
+  clearStatsCache();
+  return toSnakeCaseFeedback(result);
 }
 
 export async function remove(user: AuthUserResult, id: string) {
@@ -416,4 +430,5 @@ export async function remove(user: AuthUserResult, id: string) {
   if (!allowed) return forbiddenError("权限不足");
 
   await repo.remove(id);
+  clearStatsCache();
 }

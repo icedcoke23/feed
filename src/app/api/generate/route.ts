@@ -6,6 +6,7 @@ import { getAuthUser } from "@/lib/route-auth";
 import { errorResponse } from "@/lib/api-response";
 import { unauthorizedError } from "@/lib/api-error";
 import { sanitizeError } from "@/lib/sensitive-mask";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const generateSchema = z.object({
   studentName: z.string().min(1).max(50),
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
   if (!authUser) {
     return unauthorizedError("未授权访问");
   }
+
+  // AI 生成限流：每用户每分钟 10 次（LLM 调用成本高）
+  const limited = enforceRateLimit(`generate:${authUser.userId}`, 10, 60_000);
+  if (limited) return limited;
 
   try {
     let body: unknown;

@@ -37,42 +37,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 从 localStorage 恢复用户基本信息（不含 Token）
+  // mount 时通过 /api/auth/me 校验 Cookie 中的 Token
+  // 不再"先信任 localStorage"——避免 Token 失效后仍渲染受保护页面
   useEffect(() => {
-    const storedUser = localStorage.getItem(STORAGE_KEY);
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setTimeout(() => setUser(parsedUser), 0);
-        // 验证 token 是否仍然有效（通过调用一个需要认证的 API）
-        fetch("/api/auth/me", { credentials: "include" })
-          .then(res => {
-            if (!res.ok) {
-              // Token 无效或已过期，清除本地状态
-              setUser(null);
-              localStorage.removeItem(STORAGE_KEY);
-            } else {
-              return res.json();
-            }
-          })
-          .then(data => {
-            if (data?.user) {
-              const updatedUser = { ...parsedUser, ...data.user };
-              setUser(updatedUser);
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
-            }
-          })
-          .catch(() => {
-            // 网络错误，不清除本地状态（可能是临时问题）
-          });
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    }
-    setTimeout(() => setIsLoading(false), 0);
+    let cancelled = false;
+    fetch("/api/auth/me", { credentials: "include" })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (cancelled) return;
+          if (data?.user) {
+            setUser(data.user as User);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
+          } else {
+            setUser(null);
+            localStorage.removeItem(STORAGE_KEY);
+          }
+        } else {
+          // 401/403 等：Token 无效或已过期，清除本地缓存
+          setUser(null);
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      })
+      .catch(() => {
+        // 网络错误：不清除 localStorage（可能是临时问题），但也不信任——显示未登录
+        if (!cancelled) setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string) => {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -90,9 +90,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
     // 仅存储用户基本信息到 localStorage（Token 在 httpOnly Cookie 中，前端不操作）
     localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", {
         method: "POST",
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
-  };
+  }, []);
 
   // 带 Token 续签感知的 fetch wrapper
   const authFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {

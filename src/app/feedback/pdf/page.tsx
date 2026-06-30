@@ -1,17 +1,32 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ReportData } from "@/types/feedback";
 import { PdfCoverPage } from "@/components/business/pdf-cover-page";
-import { PdfAnalysisPage } from "@/components/business/pdf-analysis-page";
 import { PdfToolbar } from "@/components/business/pdf-toolbar";
-import { PhotoEditorModal } from "@/components/business/photo-editor-modal";
-import { ImageCropDialog } from "@/components/business/image-crop-dialog";
 import { usePdfPagination } from "@/hooks/use-pdf-pagination";
 import { usePhotoEditor } from "@/hooks/use-photo-editor";
 import { loadPdfReportData, savePdfReportData, transferToTempReport } from "@/lib/pdf-session";
+
+// 重组件延迟加载，避免进入主 bundle：
+// - PdfAnalysisPage 含 FreeLayoutPhotoEditor，体积大
+// - ImageCropDialog 含 react-easy-crop
+// - PhotoEditorModal 仅在 photoEditorOpen 时才需要
+const PdfAnalysisPage = dynamic(
+  () => import("@/components/business/pdf-analysis-page").then((m) => m.PdfAnalysisPage),
+  { ssr: false, loading: () => <div className="text-center text-gray-500 py-8">加载内容页…</div> }
+);
+const PhotoEditorModal = dynamic(
+  () => import("@/components/business/photo-editor-modal").then((m) => m.PhotoEditorModal),
+  { ssr: false }
+);
+const ImageCropDialog = dynamic(
+  () => import("@/components/business/image-crop-dialog").then((m) => m.ImageCropDialog),
+  { ssr: false }
+);
 
 // 页面配置
 const PAGE_WIDTH = 210; // mm
@@ -69,7 +84,6 @@ function PDFPreviewPageContent() {
       if (!data.campus || data.campus.trim() === "") {
         data.campus = "南沙万达校区";
       }
-      console.log("[PDF] studentPhotos:", data.studentPhotos);
       setReportData(data);
     } else {
       setNoData(true);
@@ -130,7 +144,6 @@ function PDFPreviewPageContent() {
         status: "completed",
       };
       const bodyStr = JSON.stringify(saveData);
-      console.log('[Save] request body size:', bodyStr.length, 'bytes');
       const response = await fetch("/api/feedbacks", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: bodyStr,

@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { Student, ClassItem, Teacher, StudentFormData } from "@/types/home";
 import { EMPTY_STUDENT_FORM } from "@/types/home";
+import { studentFormSchema, firstZodError } from "@/lib/validations/client";
 
 export function useStudentActions(
   fetchData: () => Promise<void>,
@@ -24,10 +25,12 @@ export function useStudentActions(
   const [newStudent, setNewStudent] = useState<StudentFormData>(EMPTY_STUDENT_FORM);
 
   const handleAddStudent = useCallback(async () => {
-    if (!newStudent.name.trim()) {
-      toast.error("请输入学员姓名");
+    const parsed = studentFormSchema.safeParse(newStudent);
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return;
     }
+    const valid = parsed.data;
 
     setAdding(true);
     try {
@@ -36,14 +39,14 @@ export function useStudentActions(
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: newStudent.name.trim(),
-          grade: newStudent.grade.trim(),
-          currentClass: newStudent.className.trim(),
-          classId: newStudent.classId || null,
-          phone: newStudent.phone.trim(),
-          school: newStudent.school,
-          currentTeacherId: newStudent.currentTeacherId || null,
-          adminTeacherId: newStudent.adminTeacherId || null,
+          name: valid.name,
+          grade: valid.grade,
+          currentClass: valid.className,
+          classId: valid.classId || null,
+          phone: valid.phone,
+          school: valid.school,
+          currentTeacherId: valid.currentTeacherId || null,
+          adminTeacherId: valid.adminTeacherId || null,
         }),
       });
       if (response.ok) {
@@ -81,10 +84,12 @@ export function useStudentActions(
   const handleSaveEdit = useCallback(async () => {
     if (!editingStudent) return;
 
-    if (!newStudent.name.trim()) {
-      toast.error("请输入学员姓名");
+    const parsed = studentFormSchema.safeParse(newStudent);
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return;
     }
+    const valid = parsed.data;
 
     setSaving(true);
     try {
@@ -93,14 +98,14 @@ export function useStudentActions(
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: newStudent.name.trim(),
-          grade: newStudent.grade.trim(),
-          school: newStudent.school.trim(),
-          phone: newStudent.phone.trim(),
-          classId: newStudent.classId || null,
-          currentTeacherId: newStudent.currentTeacherId || null,
-          adminTeacherId: newStudent.adminTeacherId || null,
-          currentClass: classes.find(c => c.id === newStudent.classId)?.name || editingStudent.current_class,
+          name: valid.name,
+          grade: valid.grade,
+          school: valid.school,
+          phone: valid.phone,
+          classId: valid.classId || null,
+          currentTeacherId: valid.currentTeacherId || null,
+          adminTeacherId: valid.adminTeacherId || null,
+          currentClass: classes.find(c => c.id === valid.classId)?.name || editingStudent.current_class,
         }),
       });
       if (response.ok) {

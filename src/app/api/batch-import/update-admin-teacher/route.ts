@@ -6,6 +6,7 @@ import { getAdminTeacherMappings } from "@/lib/config/default-admins";
 import { updateAdminTeacherSchema } from "@/lib/validations/data-import";
 import { sanitizeError } from "@/lib/sensitive-mask";
 import * as batchImportService from "@/lib/services/batch-import-service";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 // POST /api/batch-import/update-admin-teacher - 批量更新学员教务老师
 export async function POST(request: NextRequest) {
@@ -17,6 +18,10 @@ export async function POST(request: NextRequest) {
   if (authUser.userRole !== "admin") {
     return forbiddenError("仅管理员可访问");
   }
+
+  // 批量更新限流：每用户每分钟 5 次
+  const limited = enforceRateLimit(`batch-admin-teacher:${authUser.userId}`, 5, 60_000);
+  if (limited) return limited;
 
   const adminTeacherMappings = getAdminTeacherMappings();
   if (Object.keys(adminTeacherMappings).length === 0) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import useSWR from "swr";
 import { toast } from "sonner";
 import type {
   FeedbackStudent,
@@ -10,70 +11,108 @@ import type {
   FeedbackHistory,
   CourseStagePreset,
 } from "@/types/feedback";
+import {
+  fetcher,
+  STUDENTS_KEY,
+  TAGS_KEY,
+  THEMES_KEY,
+  TEACHERS_ROLE_KEY,
+  ADMIN_TEACHERS_KEY,
+  COURSE_STAGES_KEY,
+} from "@/lib/swr";
 
 export function useFeedbackData() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [students, setStudents] = useState<FeedbackStudent[]>([]);
-  const [tags, setTags] = useState<TagItem[]>([]);
-  const [themes, setThemes] = useState<FeedbackTheme[]>([]);
-  const [teachers, setTeachers] = useState<FeedbackTeacher[]>([]);
-  const [adminTeachers, setAdminTeachers] = useState<FeedbackTeacher[]>([]);
-  const [courseStagePresets, setCourseStagePresets] = useState<CourseStagePreset[]>([]);
+  // 用 SWR 获取 6 个数据源，跨组件自动去重（与 use-settings-data 共享缓存）
+  const {
+    data: studentsData,
+    isLoading: studentsLoading,
+    error: studentsError,
+    mutate: mutateStudents,
+  } = useSWR<FeedbackStudent[]>(STUDENTS_KEY, fetcher);
+  const { data: tagsData, isLoading: tagsLoading, error: tagsError, mutate: mutateTags } =
+    useSWR<TagItem[]>(TAGS_KEY, fetcher);
+  const { data: themesData, isLoading: themesLoading, error: themesError } =
+    useSWR<FeedbackTheme[]>(THEMES_KEY, fetcher);
+  const { data: teachersData, isLoading: teachersLoading, error: teachersError } =
+    useSWR<FeedbackTeacher[]>(TEACHERS_ROLE_KEY, fetcher);
+  const {
+    data: adminTeachersData,
+    isLoading: adminTeachersLoading,
+    error: adminTeachersError,
+  } = useSWR<FeedbackTeacher[]>(ADMIN_TEACHERS_KEY, fetcher);
+  const { data: stagesData, isLoading: stagesLoading, error: stagesError } =
+    useSWR<CourseStagePreset[]>(COURSE_STAGES_KEY, fetcher);
+
+  const students = studentsData ?? [];
+  const tags = tagsData ?? [];
+  const themes = themesData ?? [];
+  const teachers = teachersData ?? [];
+  const adminTeachers = adminTeachersData ?? [];
+  const courseStagePresets = stagesData ?? [];
+
+  const loading =
+    studentsLoading ||
+    tagsLoading ||
+    themesLoading ||
+    teachersLoading ||
+    adminTeachersLoading ||
+    stagesLoading;
+
+  const firstError =
+    studentsError ||
+    tagsError ||
+    themesError ||
+    teachersError ||
+    adminTeachersError ||
+    stagesError;
+  const error = firstError ? "数据加载失败，请刷新页面重试" : null;
+
+  // 错误提示（去重，避免 SWR 重试时多次 toast）
+  const errorToastedRef = useRef(false);
+  useEffect(() => {
+    if (firstError && !errorToastedRef.current) {
+      toast.error("数据加载失败，请刷新页面重试");
+      errorToastedRef.current = true;
+    }
+    if (!firstError) {
+      errorToastedRef.current = false;
+    }
+  }, [firstError]);
+
+  // 包装 SWR mutate 为 React.Dispatch 签名，保持调用方兼容
+  // （use-feedback-form 的 setTags((prev) => [...prev, savedTag.data]) 依赖此签名）
+  const setStudents = useCallback<React.Dispatch<React.SetStateAction<FeedbackStudent[]>>>(
+    (updater) => {
+      mutateStudents(
+        (prev) => {
+          const current = prev ?? [];
+          return typeof updater === "function" ? updater(current) : updater;
+        },
+        { revalidate: false }
+      );
+    },
+    [mutateStudents]
+  );
+
+  const setTags = useCallback<React.Dispatch<React.SetStateAction<TagItem[]>>>(
+    (updater) => {
+      mutateTags(
+        (prev) => {
+          const current = prev ?? [];
+          return typeof updater === "function" ? updater(current) : updater;
+        },
+        { revalidate: false }
+      );
+    },
+    [mutateTags]
+  );
+
+  // 历史记录：手动 fetch（含 AbortController + 复杂 mapping，不适合 SWR）
   const [feedbackHistory, setFeedbackHistory] = useState<FeedbackHistory[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [studentsRes, tagsRes, themesRes, teachersRes, adminTeachersRes, stagesRes] = await Promise.all([
-        fetch("/api/students", { credentials: "include" }),
-        fetch("/api/tags", { credentials: "include" }),
-        fetch("/api/themes", { credentials: "include" }),
-        fetch("/api/teachers?role=teacher", { credentials: "include" }),
-        fetch("/api/teachers?role=admin", { credentials: "include" }),
-        fetch("/api/course-stages", { credentials: "include" }),
-      ]);
-
-      // 检查所有响应是否成功
-      const responses = [studentsRes, tagsRes, themesRes, teachersRes, adminTeachersRes, stagesRes];
-      if (responses.some(r => !r.ok)) {
-        const message = "数据加载失败，请刷新页面重试";
-        setError(message);
-        toast.error(message);
-        return;
-      }
-
-      const [studentsData, tagsData, themesData, teachersData, adminTeachersData, stagesData] = await Promise.all([
-        studentsRes.json(),
-        tagsRes.json(),
-        themesRes.json(),
-        teachersRes.json(),
-        adminTeachersRes.json(),
-        stagesRes.json(),
-      ]);
-      setStudents(studentsData.data || []);
-      setTags(tagsData.data || []);
-      setThemes(themesData.data || []);
-      setTeachers(teachersData.data || []);
-      setAdminTeachers(adminTeachersData.data || []);
-      setCourseStagePresets(stagesData.data || []);
-      setError(null);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      const message = "数据加载失败，请刷新页面重试";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const fetchFeedbackHistory = useCallback(async (studentId: string) => {
-    if (!studentId) {
-      console.warn("[History] skipped: empty studentId");
-      return;
-    }
+    if (!studentId) return;
 
     // 取消前一次请求
     abortControllerRef.current?.abort();
@@ -82,7 +121,6 @@ export function useFeedbackData() {
 
     try {
       const url = `/api/feedbacks?studentId=${encodeURIComponent(studentId)}&limit=3`;
-      console.log(`[History] fetching: ${url}`);
 
       const response = await fetch(url, {
         signal: controller.signal,
@@ -100,7 +138,6 @@ export function useFeedbackData() {
         }
         const message = `获取历史记录失败 (${response.status}): ${errorText}`;
         console.error("[History] request failed:", response.status, errorText);
-        setError(message);
         toast.error(message);
         setFeedbackHistory([]);
         return;
@@ -108,7 +145,6 @@ export function useFeedbackData() {
 
       const result = await response.json();
       const rawFeedbacks = Array.isArray(result.data) ? result.data : [];
-      console.log(`[History] raw count: ${rawFeedbacks.length}`);
 
       const history: FeedbackHistory[] = rawFeedbacks.map((fb: Record<string, unknown>) => {
         const metadata =
@@ -151,21 +187,14 @@ export function useFeedbackData() {
       });
 
       setFeedbackHistory(history);
-      setError(null);
-      console.log(`[History] mapped count: ${history.length}`);
     } catch (error) {
       if ((error as Error).name === "AbortError") return;
       console.error("[History] unexpected error:", error);
       const message = error instanceof Error ? `获取历史记录失败: ${error.message}` : "获取历史记录失败";
-      setError(message);
       toast.error(message);
       setFeedbackHistory([]);
     }
   }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   return {
     loading,

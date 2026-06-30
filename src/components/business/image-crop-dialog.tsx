@@ -406,7 +406,7 @@ export function ImageCropDialog({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageSrc}
-                alt="裁剪"
+                alt="待裁剪的图片"
                 className="w-full h-full object-contain"
                 style={{ transform: `rotate(${rotation}deg) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})` }}
                 onLoad={handleFreeImageLoad}
@@ -455,21 +455,21 @@ export function ImageCropDialog({
         {/* 工具栏 */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => handleRotate(-90)} title="逆时针旋转90°" className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={() => handleRotate(-90)} title="逆时针旋转90°" aria-label="逆时针旋转90°" className="h-8 w-8">
               <RotateCcw className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => handleRotate(90)} title="顺时针旋转90°" className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={() => handleRotate(90)} title="顺时针旋转90°" aria-label="顺时针旋转90°" className="h-8 w-8">
               <RotateCw className="h-4 w-4" />
             </Button>
             <div className="w-px h-5 bg-gray-200 mx-1" />
-            <Button variant="ghost" size="icon" onClick={handleFlipH} title="水平翻转" className={`h-8 w-8 ${flipH ? "bg-blue-100 text-blue-600" : ""}`}>
+            <Button variant="ghost" size="icon" onClick={handleFlipH} title="水平翻转" aria-label="水平翻转" className={`h-8 w-8 ${flipH ? "bg-blue-100 text-blue-600" : ""}`}>
               <FlipHorizontal className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleFlipV} title="垂直翻转" className={`h-8 w-8 ${flipV ? "bg-blue-100 text-blue-600" : ""}`}>
+            <Button variant="ghost" size="icon" onClick={handleFlipV} title="垂直翻转" aria-label="垂直翻转" className={`h-8 w-8 ${flipV ? "bg-blue-100 text-blue-600" : ""}`}>
               <FlipVertical className="h-4 w-4" />
             </Button>
             <div className="w-px h-5 bg-gray-200 mx-1" />
-            <Button variant="ghost" size="icon" onClick={handleReset} title="重置" className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={handleReset} title="重置" aria-label="重置" className="h-8 w-8">
               <Maximize2 className="h-4 w-4" />
             </Button>
           </div>
@@ -477,11 +477,11 @@ export function ImageCropDialog({
           {/* 缩放（仅固定比例模式） */}
           {!isFreeCrop && (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={handleZoomOut} disabled={zoom <= 1} className="h-8 w-8">
+              <Button variant="ghost" size="icon" onClick={handleZoomOut} disabled={zoom <= 1} title="缩小" aria-label="缩小" className="h-8 w-8">
                 <ZoomOut className="h-4 w-4" />
               </Button>
-              <input type="range" min={1} max={maxZoom} step={0.1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-28 h-1.5 accent-blue-600 cursor-pointer" />
-              <Button variant="ghost" size="icon" onClick={handleZoomIn} disabled={zoom >= maxZoom} className="h-8 w-8">
+              <input type="range" min={1} max={maxZoom} step={0.1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="缩放比例" className="w-28 h-1.5 accent-blue-600 cursor-pointer" />
+              <Button variant="ghost" size="icon" onClick={handleZoomIn} disabled={zoom >= maxZoom} title="放大" aria-label="放大" className="h-8 w-8">
                 <ZoomIn className="h-4 w-4" />
               </Button>
               <span className="text-xs text-gray-500 w-10 text-right tabular-nums">{zoom.toFixed(1)}x</span>

@@ -216,26 +216,29 @@ export async function updateAdminTeachers(
     teacherIdByType.set(type, teacherIdByUsername.get(username) || null);
   }
 
-  for (const item of items) {
-    const adminTeacherId = teacherIdByType.get(item.adminType);
+  // 使用事务保护批量更新：任一失败则全部回滚，避免部分学生更新导致数据不一致
+  await db.transaction(async (tx) => {
+    for (const item of items) {
+      const adminTeacherId = teacherIdByType.get(item.adminType);
 
-    if (!adminTeacherId) {
-      result.errors.push(`未找到教务老师: ${item.adminType}`);
-      continue;
+      if (!adminTeacherId) {
+        result.errors.push(`未找到教务老师: ${item.adminType}`);
+        continue;
+      }
+
+      const updatedRows = await tx
+        .update(students)
+        .set({ adminTeacherId })
+        .where(eq(students.name, item.name))
+        .returning({ id: students.id });
+
+      if (updatedRows.length === 0) {
+        result.notFound.push(item.name);
+      } else {
+        result.updated += updatedRows.length;
+      }
     }
-
-    const updatedRows = await db
-      .update(students)
-      .set({ adminTeacherId })
-      .where(eq(students.name, item.name))
-      .returning({ id: students.id });
-
-    if (updatedRows.length === 0) {
-      result.notFound.push(item.name);
-    } else {
-      result.updated += updatedRows.length;
-    }
-  }
+  });
 
   return result;
 }

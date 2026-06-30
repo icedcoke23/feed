@@ -5,18 +5,6 @@ import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import * as themeService from "@/lib/services/theme-service";
-import type { TeachingTheme } from "@/storage/database/shared/schema";
-
-function toThemeResponse(theme: TeachingTheme) {
-  return {
-    id: theme.id,
-    name: theme.name,
-    category: theme.category,
-    description: theme.description,
-    sort_order: theme.sortOrder,
-    is_active: theme.isActive,
-  };
-}
 
 // GET /api/themes - 获取教学主题列表
 export async function GET(request: NextRequest) {
@@ -34,7 +22,7 @@ export async function GET(request: NextRequest) {
       return result;
     }
 
-    return successResponse(result.map(toThemeResponse));
+    return successResponse(result);
   } catch (error) {
     return handleDbError(error, "获取主题列表");
   }
@@ -63,7 +51,7 @@ export async function POST(request: NextRequest) {
       return data;
     }
 
-    return successResponse(toThemeResponse(data));
+    return successResponse(data);
   } catch (error) {
     return handleDbError(error, "创建主题");
   }

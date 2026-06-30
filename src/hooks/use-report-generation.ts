@@ -125,8 +125,6 @@ export function useReportGeneration({
       }).filter(([, v]) => v !== undefined && v !== null)
     );
 
-    console.log("[Generate] request body:", generateBody);
-
     const result = await generateStream.startStream("/api/generate", generateBody);
 
     if (result) {
@@ -186,8 +184,6 @@ export function useReportGeneration({
         promptStageCode,
       }).filter(([, v]) => v !== undefined && v !== null)
     );
-
-    console.log("[Review] request body:", reviewBody);
 
     const result = await reviewStream.startStream("/api/generate/review", reviewBody);
 

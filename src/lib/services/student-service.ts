@@ -10,6 +10,7 @@ import {
 import { eq, inArray, and, or, isNull, desc } from "drizzle-orm";
 import * as repo from "@/lib/repositories/student-repository";
 import * as authService from "@/lib/services/auth-service";
+import { clearStatsCache } from "@/lib/services/stats-service";
 import { buildPaginationMeta } from "@/lib/pagination";
 import {
   forbiddenError,
@@ -18,12 +19,14 @@ import {
 } from "@/lib/api-error";
 import { extractLegacyMetadata } from "@/utils/ai-report";
 import { maskPhone } from "@/lib/sensitive-mask";
+import { isAdmin } from "@/lib/services/auth-utils";
+import {
+  toSnakeCaseFeedback,
+  toSnakeCaseStudent,
+  toSnakeCaseClassTransfer,
+} from "@/lib/services/snake-case-mappers";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { Student, InsertStudent } from "@/storage/database/shared/schema";
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
 
 function isStaffTeacher(user: AuthUserResult) {
   return user.userRole === "teacher" && user.teacherRole === "admin";
@@ -38,23 +41,6 @@ async function canAccessStudent(
     return student.adminTeacherId === user.userId;
   }
   return authService.canTeacherAccessStudent(user.userId, student.id);
-}
-
-function toSnakeCaseStudent(student: Student) {
-  return {
-    id: student.id,
-    name: student.name,
-    grade: student.grade,
-    school: student.school,
-    phone: maskPhone(student.phone),
-    current_class: student.currentClass,
-    class_id: student.classId,
-    current_teacher_id: student.currentTeacherId,
-    admin_teacher_id: student.adminTeacherId,
-    is_active: student.isActive,
-    created_at: student.createdAt,
-    updated_at: student.updatedAt,
-  };
 }
 
 type ClassInfo = {
@@ -293,8 +279,8 @@ export async function findById(user: AuthUserResult, id: string) {
 
   return {
     ...enriched,
-    feedbacks: feedbacksList,
-    transfers: transfersList,
+    feedbacks: feedbacksList.map(toSnakeCaseFeedback),
+    transfers: transfersList.map(toSnakeCaseClassTransfer),
   };
 }
 
@@ -302,6 +288,7 @@ export async function create(user: AuthUserResult, payload: InsertStudent) {
   if (!isAdmin(user)) return forbiddenError("权限不足");
   const student = await repo.create({ ...payload, isActive: true });
   const [enriched] = await enrichStudents([student]);
+  clearStatsCache();
   return enriched;
 }
 
@@ -341,6 +328,7 @@ export async function remove(user: AuthUserResult, id: string) {
   if (!allowed) return forbiddenError("权限不足");
 
   await repo.update(id, { isActive: false, updatedAt: new Date() });
+  clearStatsCache();
 }
 
 export async function history(user: AuthUserResult, id: string) {
@@ -497,6 +485,8 @@ export async function transfer(
     });
   });
 
+  clearStatsCache();
+
   return {
     ...toSnakeCaseStudent(student),
     class_id: targetClass.id,
@@ -558,5 +548,6 @@ export async function batchCreate(
   }));
 
   const data = await db.insert(students).values(toInsert).returning();
+  clearStatsCache();
   return { data, count: data.length };
 }
