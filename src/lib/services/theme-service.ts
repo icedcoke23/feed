@@ -1,20 +1,19 @@
 import * as repo from "@/lib/repositories/theme-repository";
 import { forbiddenError, notFoundError } from "@/lib/api-error";
 import { successResponse } from "@/lib/api-response";
+import { isAdmin } from "@/lib/services/auth-utils";
+import { toSnakeCaseTheme } from "@/lib/services/snake-case-mappers";
 import type { AuthUserResult } from "@/lib/route-auth";
 
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
-
 export async function list(user: AuthUserResult, options: repo.ListThemesOptions) {
-  return repo.list(options);
+  const themes = await repo.list(options);
+  return themes.map(toSnakeCaseTheme);
 }
 
 export async function findById(user: AuthUserResult, id: string) {
   const theme = await repo.findById(id);
   if (!theme) return notFoundError("主题不存在");
-  return theme;
+  return toSnakeCaseTheme(theme);
 }
 
 export async function create(
@@ -24,7 +23,8 @@ export async function create(
   if (!isAdmin(user)) {
     return forbiddenError("权限不足");
   }
-  return repo.create(payload);
+  const theme = await repo.create(payload);
+  return toSnakeCaseTheme(theme);
 }
 
 export async function batchCreate(
@@ -34,7 +34,8 @@ export async function batchCreate(
   if (!isAdmin(user)) {
     return forbiddenError("权限不足");
   }
-  return repo.batchCreate(payloads);
+  const themes = await repo.batchCreate(payloads);
+  return themes.map(toSnakeCaseTheme);
 }
 
 export async function update(
@@ -47,7 +48,9 @@ export async function update(
   }
   const existing = await repo.findById(id);
   if (!existing) return notFoundError("主题不存在");
-  return repo.update(id, payload);
+  const theme = await repo.update(id, payload);
+  if (!theme) return notFoundError("主题不存在");
+  return toSnakeCaseTheme(theme);
 }
 
 export async function remove(user: AuthUserResult, id: string) {

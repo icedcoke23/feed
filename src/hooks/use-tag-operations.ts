@@ -60,10 +60,9 @@ export function useTagOperations({ tags, setTags }: UseTagOperationsOptions) {
 
     setAddingCustomTag(true);
     const category = customTagCategory || "strength";
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
       const saveResponse = await fetch("/api/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,58 +74,41 @@ export function useTagOperations({ tags, setTags }: UseTagOperationsOptions) {
         }),
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
 
-      const savedTag = await saveResponse.json();
+      const savedTag = await saveResponse.json().catch(() => null);
 
       if (!saveResponse.ok) {
         toast.error("保存标签失败");
         return;
       }
 
-      if (savedTag.data) {
-        setTags((prev) => [...prev, savedTag.data]);
-        setTagRatings((prev) => ({
-          ...prev,
-          [savedTag.data.id]: {
-            rating: customTagRating,
-            note: customTagNote,
-            isCustom: true,
-            category: customTagCategory,
-          },
-        }));
-      } else {
-        const tempId = `custom-${Date.now()}`;
-        setTagRatings((prev) => ({
-          ...prev,
-          [tempId]: {
-            rating: customTagRating,
-            note: customTagNote,
-            isCustom: true,
-            category: customTagCategory,
-          },
-        }));
+      // 仅当服务端确实返回了带 id 的标签记录时才写入状态，
+      // 否则不写任何虚假状态——避免 UI 显示一条并不存在的标签。
+      if (!savedTag?.data?.id) {
+        toast.error("标签添加失败，请重试");
+        return;
       }
 
-      setCustomTagName("");
-      setCustomTagNote("");
-      setCustomTagRating(3);
-    } catch (error) {
-      console.error("Failed to add custom tag:", error);
-      const tempId = `custom-${Date.now()}`;
+      setTags((prev) => [...prev, savedTag.data]);
       setTagRatings((prev) => ({
         ...prev,
-        [tempId]: {
+        [savedTag.data.id]: {
           rating: customTagRating,
           note: customTagNote,
           isCustom: true,
           category: customTagCategory,
         },
       }));
+
       setCustomTagName("");
       setCustomTagNote("");
       setCustomTagRating(3);
+    } catch (error) {
+      // 网络失败/超时：不写虚假状态，仅提示用户重试
+      console.error("Failed to add custom tag:", error);
+      toast.error("标签添加失败，请重试");
     } finally {
+      clearTimeout(timeoutId);
       setAddingCustomTag(false);
     }
   }, [customTagName, customTagNote, customTagRating, customTagCategory, setTags]);

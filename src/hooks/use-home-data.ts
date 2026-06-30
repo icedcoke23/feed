@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
 import type { Student, ClassItem, Teacher } from "@/types/home";
@@ -30,7 +30,18 @@ export function useHomeData() {
   const [studentsPagination, setStudentsPagination] = useState<PaginationMeta | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // 竞态保护：新请求前 abort 旧请求；loadMore 防重入
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const loadingMoreRef = useRef(false);
+
   const fetchData = useCallback(async (page = 1, append = false) => {
+    // 取消进行中的旧请求，避免慢请求覆盖快请求的结果
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     if (append) {
       setLoadingMore(true);
     } else {
@@ -39,7 +50,10 @@ export function useHomeData() {
     try {
       // 优先使用聚合 API
       try {
-        const res = await fetch(`/api/home-data?page=${page}&limit=50`, { credentials: "include" });
+        const res = await fetch(`/api/home-data?page=${page}&limit=50`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error("聚合 API 失败");
 
         const result = await res.json();
@@ -58,13 +72,15 @@ export function useHomeData() {
         setAdminTeachers(result.data?.adminTeachers || []);
         setError(null);
       } catch (aggregateError) {
+        // 被取消的请求不进入 fallback
+        if (controller.signal.aborted) return;
         // 聚合 API 失败，fallback 到原有请求
         console.warn("聚合 API 失败，回退到独立请求:", aggregateError);
         const [studentsRes, classesRes, teachersRes, adminTeachersRes] = await Promise.all([
-          fetch(`/api/students?page=${page}&limit=50`, { credentials: "include" }),
-          fetch("/api/classes", { credentials: "include" }),
-          fetch("/api/teachers", { credentials: "include" }),
-          fetch("/api/teachers?role=admin", { credentials: "include" }),
+          fetch(`/api/students?page=${page}&limit=50`, { credentials: "include", signal: controller.signal }),
+          fetch("/api/classes", { credentials: "include", signal: controller.signal }),
+          fetch("/api/teachers", { credentials: "include", signal: controller.signal }),
+          fetch("/api/teachers?role=admin", { credentials: "include", signal: controller.signal }),
         ]);
         // 检查响应状态
         if (!studentsRes.ok || !classesRes.ok || !teachersRes.ok || !adminTeachersRes.ok) {
@@ -95,19 +111,30 @@ export function useHomeData() {
         setError(null);
       }
     } catch (error) {
+      // AbortError 是预期行为（被新请求取代），不提示用户
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       console.error("Failed to fetch data:", error);
       const message = "数据加载失败，请刷新页面重试";
       setError(message);
       toast.error(message);
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setLoading(false);
       setLoadingMore(false);
     }
   }, []);
 
   const loadMoreStudents = useCallback(() => {
+    if (loadingMoreRef.current) return;
     if (studentsPagination && studentsPage < studentsPagination.totalPages) {
-      fetchData(studentsPage + 1, true);
+      loadingMoreRef.current = true;
+      fetchData(studentsPage + 1, true).finally(() => {
+        loadingMoreRef.current = false;
+      });
     }
   }, [studentsPagination, studentsPage, fetchData]);
 
@@ -119,6 +146,13 @@ export function useHomeData() {
     if (!authLoading && user) {
       fetchData();
     }
+    // 卸载或依赖变化时取消进行中的请求
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
   }, [authLoading, user, fetchData]);
 
   // 新获取到班级时，默认全部展开
@@ -190,7 +224,6 @@ export function useHomeData() {
     classes.forEach(cls => {
       newState[cls.id] = expand;
     });
-    newState['temp'] = expand;
     setExpandedClasses(newState);
   };
 

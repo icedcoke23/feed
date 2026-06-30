@@ -86,7 +86,10 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    await teacherService.remove(authUser, id);
+    const result = await teacherService.remove(authUser, id);
+    if (result instanceof Response) {
+      return result;
+    }
     return successResponse(null, "删除成功");
   } catch (error) {
     return handleDbError(error, "删除教师");

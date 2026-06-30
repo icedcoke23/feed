@@ -50,8 +50,8 @@ export function useFeedbackForm({
   const restoreFromSession = searchParams.get("restore");
   const editIdFromUrl = searchParams.get("editId");
 
-  // 编辑模式
-  const [editId] = useState<string | null>(editIdFromUrl);
+  // 编辑模式：editId 直接派生自 URL，确保 URL 变化时同步更新（原 useState 仅捕获初始值）
+  const editId = editIdFromUrl;
   const [editLoading, setEditLoading] = useState(!!editIdFromUrl);
   const isEditMode = !!editIdFromUrl;
 

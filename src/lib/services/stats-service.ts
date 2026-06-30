@@ -67,9 +67,10 @@ export async function getStats(user: AuthUserResult): Promise<StatsResult | Resp
 
   // 标签使用统计的 SQL 片段：用 jsonb_array_elements 展开数组，UNION ALL 汇总三类标签，
   // 最后 GROUP BY tag + COUNT FILTER 统计各类出现次数。避免拉全表 JSONB 到内存做 JS 遍历。
+  // 安全修复：原 sql.raw 字符串拼接改为 inArray 参数化绑定，消除 SQL 注入风险。
   const tagAccessFilter =
     accessibleStudentIds && accessibleStudentIds.length > 0
-      ? sql`AND ${feedbacks.studentId} = ANY(${sql.raw(`ARRAY[${accessibleStudentIds.map((id) => `'${id}'`).join(",")}]::text[]`)})`
+      ? sql`AND ${inArray(feedbacks.studentId, accessibleStudentIds)}`
       : sql``;
 
   const [

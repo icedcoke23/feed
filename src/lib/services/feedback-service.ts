@@ -15,42 +15,13 @@ import {
   badRequestError,
 } from "@/lib/api-error";
 import { extractLegacyMetadata } from "@/utils/ai-report";
+import { isAdmin } from "@/lib/services/auth-utils";
+import { toSnakeCaseFeedback } from "@/lib/services/snake-case-mappers";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { InsertFeedback, Feedback } from "@/storage/database/shared/schema";
 
-/**
- * 将 Drizzle 返回的 camelCase 反馈对象转换为前端期望的 snake_case 格式。
- * 与 student-service 的 toSnakeCaseStudent 模式一致，保持 API 输出格式统一。
- * 修复 bug：前端类型（FeedbackDetail/StudentFeedback）用 snake_case，
- * 但 feedback-service 直接返回 raw Drizzle（camelCase），导致字段读取 undefined。
- */
-export function toSnakeCaseFeedback(feedback: typeof feedbacks.$inferSelect) {
-  return {
-    id: feedback.id,
-    student_id: feedback.studentId,
-    teacher_id: feedback.teacherId,
-    strengths: feedback.strengths,
-    improvements: feedback.improvements,
-    weaknesses: feedback.weaknesses,
-    teaching_plan: feedback.teachingPlan,
-    suggestions: feedback.suggestions,
-    ai_report: feedback.aiReport,
-    metadata: feedback.metadata,
-    work_info: feedback.workInfo,
-    ability_scores: feedback.abilityScores,
-    version: feedback.version,
-    parent_feedback_id: feedback.parentFeedbackId,
-    status: feedback.status,
-    created_at: feedback.createdAt,
-    updated_at: feedback.updatedAt,
-    period_start: feedback.periodStart,
-    period_end: feedback.periodEnd,
-  };
-}
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
+// 重新导出，保持 `import { toSnakeCaseFeedback } from "@/lib/services/feedback-service"` 兼容
+export { toSnakeCaseFeedback };
 
 function isStaffTeacher(user: AuthUserResult) {
   return user.userRole === "teacher" && user.teacherRole === "admin";
@@ -416,6 +387,7 @@ export async function update(
   if (!allowed) return forbiddenError("权限不足");
 
   const result = await db.transaction(async (tx) => {
+    // 事务内重新读取版本号，避免读后写竞态
     const rows = await tx
       .select({ version: feedbacks.version })
       .from(feedbacks)
@@ -429,11 +401,19 @@ export async function update(
       existing.metadata as Record<string, unknown> | null,
       current.version + 1
     );
+
+    // 乐观锁：WHERE 条件包含 version 校验。
+    // 若并发请求已修改该行，version 不匹配，update 命中 0 行，
+    // 事务回滚并提示用户刷新后重试，防止"最后写入获胜"覆盖。
     const updated = await tx
       .update(feedbacks)
       .set(payload)
-      .where(eq(feedbacks.id, id))
+      .where(and(eq(feedbacks.id, id), eq(feedbacks.version, current.version)))
       .returning();
+
+    if (updated.length === 0) {
+      return badRequestError("反馈已被其他操作修改，请刷新后重试");
+    }
     return updated[0];
   });
 

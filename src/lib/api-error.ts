@@ -74,20 +74,20 @@ export function handleDbError(error: unknown, context: string = "操作"): NextR
 
 // 未认证错误
 export function unauthorizedError(message: string = "请先登录"): NextResponse {
-  return apiError(message, 401);
+  return apiError(message, 401, "UNAUTHORIZED");
 }
 
 // 权限不足错误
 export function forbiddenError(message: string = "权限不足"): NextResponse {
-  return apiError(message, 403);
+  return apiError(message, 403, "FORBIDDEN");
 }
 
 // 资源未找到错误
 export function notFoundError(message: string = "资源未找到"): NextResponse {
-  return apiError(message, 404);
+  return apiError(message, 404, "NOT_FOUND");
 }
 
 // 请求参数错误
 export function badRequestError(message: string = "请求参数错误", details?: unknown): NextResponse {
-  return errorResponse(message, 400, undefined, details);
+  return errorResponse(message, 400, "BAD_REQUEST", details);
 }

@@ -3,12 +3,9 @@ import { forbiddenError } from "@/lib/api-error";
 import { DEFAULT_COZE_MODEL, getDefaultPrompt } from "@/lib/constants/ai";
 import { isMaskedKey } from "@/lib/ai-client";
 import { maskApiKey, maskUrl } from "@/lib/sensitive-mask";
+import { isAdmin } from "@/lib/services/auth-utils";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { AiSetting, InsertAiSetting } from "@/storage/database/shared/schema";
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin";
-}
 
 export interface AISettingsResponse {
   api_key: string;

@@ -5,18 +5,6 @@ import { handleDbError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import * as tagService from "@/lib/services/tag-service";
-import type { Tag } from "@/storage/database/shared/schema";
-
-function toTagResponse(tag: Tag) {
-  return {
-    id: tag.id,
-    category: tag.category,
-    name: tag.name,
-    description: tag.description,
-    sort_order: tag.sortOrder,
-    is_active: tag.isActive,
-  };
-}
 
 // GET /api/tags - 获取标签列表
 export async function GET(request: NextRequest) {
@@ -34,7 +22,7 @@ export async function GET(request: NextRequest) {
       return result;
     }
 
-    return successResponse(result.map(toTagResponse));
+    return successResponse(result);
   } catch (error) {
     return handleDbError(error, "获取标签列表");
   }
@@ -63,7 +51,7 @@ export async function POST(request: NextRequest) {
       return data;
     }
 
-    return successResponse(toTagResponse(data));
+    return successResponse(data);
   } catch (error) {
     return handleDbError(error, "创建标签");
   }

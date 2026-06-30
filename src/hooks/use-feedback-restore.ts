@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type {
   TagItem,
@@ -66,9 +66,16 @@ export function useFeedbackRestore({
   setCurrentStep,
   setEditLoading,
 }: UseFeedbackRestoreOptions) {
+  // 防止 effect 重跑覆盖用户编辑：首次恢复/加载后置 true，后续 tags/themes 变化不重跑
+  const restoredRef = useRef(false);
+  const editLoadedRef = useRef<string | null>(null);
+
   // 从 sessionStorage/localStorage 恢复数据
   useEffect(() => {
     if (!restoreFromSession) return;
+    // 仅在首次恢复时执行，避免 tags/themes 变化时覆盖用户已编辑的内容
+    if (restoredRef.current) return;
+    restoredRef.current = true;
 
     const applyDraft = (draft: DraftData) => {
       setSelectedStudentId(draft.selectedStudentId || "");
@@ -158,6 +165,12 @@ export function useFeedbackRestore({
   // 编辑模式：从 API 加载已有反馈数据并预填表单
   useEffect(() => {
     if (!editIdFromUrl) return;
+    // 同一 editId 仅加载一次，避免 tags/themes 后续加载时覆盖用户已编辑的内容
+    if (editLoadedRef.current === editIdFromUrl) return;
+    // editId 切换到另一条反馈时重置标记，允许重新加载
+    if (editLoadedRef.current && editLoadedRef.current !== editIdFromUrl) {
+      editLoadedRef.current = null;
+    }
 
     let cancelled = false;
 
@@ -283,8 +296,12 @@ export function useFeedbackRestore({
       }
     };
 
-    // 等待 tags 数据加载完成后再预填
-    if (tags.length > 0) {
+    // tags 已加载（包括"加载完成但为空"）后预填。
+    // 原条件 `tags.length > 0` 会在 DB 无标签时永远不加载编辑数据；
+    // 改为 `tags !== undefined` 允许空数组通过，由 editLoadedRef 防止重跑覆盖。
+    // tags 在父组件中始终为数组（SWR data ?? []），此处判断保留以表达"已就绪"语义。
+    if (tags !== undefined) {
+      editLoadedRef.current = editIdFromUrl;
       loadFeedbackForEdit();
     }
 

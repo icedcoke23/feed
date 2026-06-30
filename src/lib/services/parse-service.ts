@@ -123,11 +123,18 @@ export async function parseContent(content: string, type?: "students" | "themes"
   try {
     parsedData = JSON.parse(responseText);
   } catch {
+    // 首次解析失败：尝试从响应中提取 JSON 片段后二次解析
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      parsedData = JSON.parse(jsonMatch[0]);
+      try {
+        parsedData = JSON.parse(jsonMatch[0]);
+      } catch (innerError) {
+        throw new Error(
+          `AI响应JSON二次解析失败: ${innerError instanceof Error ? innerError.message : String(innerError)}`
+        );
+      }
     } else {
-      throw new Error("无法解析AI响应");
+      throw new Error("无法解析AI响应：未找到JSON内容");
     }
   }
 

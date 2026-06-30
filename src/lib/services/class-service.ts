@@ -1,22 +1,24 @@
 import { db } from "@/storage/database/drizzle-client";
-import { teachers } from "@/storage/database/shared/schema";
+import { teachers, classes } from "@/storage/database/shared/schema";
 import { inArray } from "drizzle-orm";
 import * as repo from "@/lib/repositories/class-repository";
 import { buildPaginationMeta } from "@/lib/pagination";
 import { forbiddenError, notFoundError } from "@/lib/api-error";
 import { maskPhone } from "@/lib/sensitive-mask";
+import { isAdmin } from "@/lib/services/auth-utils";
+import { toSnakeCaseClass } from "@/lib/services/snake-case-mappers";
 import type { AuthUserResult } from "@/lib/route-auth";
 
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
+type ClassRow = typeof classes.$inferSelect;
+type ClassTeacherInfo = { id: string; name: string; phone: string | null };
+type SnakeCaseClass = ReturnType<typeof toSnakeCaseClass>;
 
-async function attachTeachers<T extends { teacherId: string | null }>(
-  rows: T[]
-): Promise<(T & { teacher: { id: string; name: string; phone: string | null } | null })[]> {
+async function attachTeachers(
+  rows: ClassRow[]
+): Promise<Array<SnakeCaseClass & { teacher: ClassTeacherInfo | null }>> {
   const teacherIds = rows.map((r) => r.teacherId).filter(Boolean) as string[];
   if (teacherIds.length === 0) {
-    return rows.map((r) => ({ ...r, teacher: null }));
+    return rows.map((r) => ({ ...toSnakeCaseClass(r), teacher: null }));
   }
   const teacherRows = await db
     .select({ id: teachers.id, name: teachers.name, phone: teachers.phone })
@@ -25,7 +27,10 @@ async function attachTeachers<T extends { teacherId: string | null }>(
   const teacherMap = new Map(
     teacherRows.map((t) => [t.id, { id: t.id, name: t.name, phone: maskPhone(t.phone) }])
   );
-  return rows.map((r) => ({ ...r, teacher: r.teacherId ? teacherMap.get(r.teacherId) ?? null : null }));
+  return rows.map((r) => ({
+    ...toSnakeCaseClass(r),
+    teacher: r.teacherId ? teacherMap.get(r.teacherId) ?? null : null,
+  }));
 }
 
 export async function list(user: AuthUserResult, options: repo.ListClassesOptions) {

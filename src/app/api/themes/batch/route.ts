@@ -6,7 +6,6 @@ import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { sanitizeError } from "@/lib/sensitive-mask";
 import * as themeService from "@/lib/services/theme-service";
-import type { TeachingTheme } from "@/storage/database/shared/schema";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
 const themeItemSchema = z.object({
@@ -18,17 +17,6 @@ const themeItemSchema = z.object({
 const batchThemesSchema = z.object({
   themes: z.array(themeItemSchema).min(1, "请提供主题数据").max(100, "单次最多导入100条记录"),
 });
-
-function toThemeResponse(theme: TeachingTheme) {
-  return {
-    id: theme.id,
-    name: theme.name,
-    category: theme.category,
-    description: theme.description,
-    sort_order: theme.sortOrder,
-    is_active: theme.isActive,
-  };
-}
 
 // POST /api/themes/batch - 批量添加教学主题
 export async function POST(request: NextRequest) {
@@ -64,7 +52,7 @@ export async function POST(request: NextRequest) {
       return data;
     }
 
-    return successResponse(data.map(toThemeResponse), `成功添加 ${data.length} 个主题`);
+    return successResponse(data, `成功添加 ${data.length} 个主题`);
   } catch (error) {
     console.error("Batch add themes error:", sanitizeError(error));
     return handleDbError(error, "批量添加主题");

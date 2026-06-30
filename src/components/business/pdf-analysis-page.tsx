@@ -418,7 +418,7 @@ export function PdfAnalysisPage({
                     const stageStatus = plan.status || getStageStatus();
 
                     return (
-                      <tr key={plan.id || index} className={
+                      <tr key={plan.id || `plan-${pageIndex}-${index}-${plan.stage}`} className={
                         stageStatus === 'current' ? 'bg-blue-50' :
                         stageStatus === 'completed' ? 'bg-green-50' : ''
                       }>

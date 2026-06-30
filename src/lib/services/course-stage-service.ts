@@ -3,13 +3,10 @@ import { forbiddenError, notFoundError } from "@/lib/api-error";
 import { successResponse } from "@/lib/api-response";
 import { DEFAULT_COURSE_STAGES } from "@/lib/constants/course-stages";
 import { sanitizeError } from "@/lib/sensitive-mask";
+import { isAdmin } from "@/lib/services/auth-utils";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { CourseStage as CourseStageRow } from "@/storage/database/shared/schema";
 import type { CourseStage } from "@/types/settings";
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin";
-}
 
 function toResponse(stage: CourseStageRow): CourseStage {
   return {

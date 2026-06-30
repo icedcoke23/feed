@@ -109,27 +109,49 @@ export interface InitDataResult {
 }
 
 export async function initializeDefaults(): Promise<InitDataResult> {
+  // 快速路径：若已有标签则跳过，避免不必要的事务开销
   const existingTags = await db.select({ id: tags.id }).from(tags).limit(1);
   if (existingTags.length > 0) {
     return { tags: 0, themes: 0, courseStages: 0, skipped: true };
   }
 
-  await db.insert(tags).values(defaultTags.map(toTagInsert));
-  await db.insert(teachingThemes).values(defaultThemes.map(toThemeInsert));
+  // 事务 + onConflictDoNothing：保证原子性，并防止并发请求导致重复数据。
+  // tags 有 (category, name) 唯一索引，courseStages 有 stageCode 唯一约束，
+  // 冲突时静默跳过；returning 计数实际插入行数。
+  return db.transaction(async (tx) => {
+    const insertedTags = await tx
+      .insert(tags)
+      .values(defaultTags.map(toTagInsert))
+      .onConflictDoNothing()
+      .returning({ id: tags.id });
 
-  const existingStages = await db.select({ id: courseStages.id }).from(courseStages).limit(1);
-  let courseStagesCount = 0;
-  if (existingStages.length === 0) {
-    await db.insert(courseStages).values(DEFAULT_COURSE_STAGES.map(toCourseStageInsert));
-    courseStagesCount = DEFAULT_COURSE_STAGES.length;
-  }
+    const insertedThemes = await tx
+      .insert(teachingThemes)
+      .values(defaultThemes.map(toThemeInsert))
+      .onConflictDoNothing()
+      .returning({ id: teachingThemes.id });
 
-  return {
-    tags: defaultTags.length,
-    themes: defaultThemes.length,
-    courseStages: courseStagesCount,
-    skipped: false,
-  };
+    const existingStages = await tx
+      .select({ id: courseStages.id })
+      .from(courseStages)
+      .limit(1);
+    let courseStagesCount = 0;
+    if (existingStages.length === 0) {
+      const insertedStages = await tx
+        .insert(courseStages)
+        .values(DEFAULT_COURSE_STAGES.map(toCourseStageInsert))
+        .onConflictDoNothing()
+        .returning({ id: courseStages.id });
+      courseStagesCount = insertedStages.length;
+    }
+
+    return {
+      tags: insertedTags.length,
+      themes: insertedThemes.length,
+      courseStages: courseStagesCount,
+      skipped: false,
+    };
+  });
 }
 
 function toTagInsert(tag: (typeof defaultTags)[number]) {

@@ -11,7 +11,6 @@ import { eq, inArray, and, or, isNull, desc } from "drizzle-orm";
 import * as repo from "@/lib/repositories/student-repository";
 import * as authService from "@/lib/services/auth-service";
 import { clearStatsCache } from "@/lib/services/stats-service";
-import { toSnakeCaseFeedback } from "@/lib/services/feedback-service";
 import { buildPaginationMeta } from "@/lib/pagination";
 import {
   forbiddenError,
@@ -20,12 +19,14 @@ import {
 } from "@/lib/api-error";
 import { extractLegacyMetadata } from "@/utils/ai-report";
 import { maskPhone } from "@/lib/sensitive-mask";
+import { isAdmin } from "@/lib/services/auth-utils";
+import {
+  toSnakeCaseFeedback,
+  toSnakeCaseStudent,
+  toSnakeCaseClassTransfer,
+} from "@/lib/services/snake-case-mappers";
 import type { AuthUserResult } from "@/lib/route-auth";
 import type { Student, InsertStudent } from "@/storage/database/shared/schema";
-
-function isAdmin(user: AuthUserResult) {
-  return user.userRole === "admin" || user.teacherRole === "admin";
-}
 
 function isStaffTeacher(user: AuthUserResult) {
   return user.userRole === "teacher" && user.teacherRole === "admin";
@@ -40,23 +41,6 @@ async function canAccessStudent(
     return student.adminTeacherId === user.userId;
   }
   return authService.canTeacherAccessStudent(user.userId, student.id);
-}
-
-function toSnakeCaseStudent(student: Student) {
-  return {
-    id: student.id,
-    name: student.name,
-    grade: student.grade,
-    school: student.school,
-    phone: maskPhone(student.phone),
-    current_class: student.currentClass,
-    class_id: student.classId,
-    current_teacher_id: student.currentTeacherId,
-    admin_teacher_id: student.adminTeacherId,
-    is_active: student.isActive,
-    created_at: student.createdAt,
-    updated_at: student.updatedAt,
-  };
 }
 
 type ClassInfo = {
@@ -296,16 +280,7 @@ export async function findById(user: AuthUserResult, id: string) {
   return {
     ...enriched,
     feedbacks: feedbacksList.map(toSnakeCaseFeedback),
-    transfers: transfersList.map((t) => ({
-      id: t.id,
-      student_id: t.studentId,
-      from_teacher_id: t.fromTeacherId,
-      to_teacher_id: t.toTeacherId,
-      from_class: t.fromClass,
-      to_class: t.toClass,
-      reason: t.reason,
-      transferred_at: t.transferredAt,
-    })),
+    transfers: transfersList.map(toSnakeCaseClassTransfer),
   };
 }
 

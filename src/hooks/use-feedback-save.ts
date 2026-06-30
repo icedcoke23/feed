@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { useSWRConfig } from "swr";
 import { toast } from "sonner";
 import type {
   TagItem,
@@ -47,8 +48,16 @@ export function useFeedbackSave(options: UseFeedbackSaveOptions) {
   // latest-ref：每次渲染更新，saveFeedback 读取最新值，引用保持稳定
   const optionsRef = useRef(options);
   optionsRef.current = options;
+  // 并发锁：防止用户重复点击保存按钮导致重复提交
+  const savingRef = useRef(false);
+  const { mutate: globalMutate } = useSWRConfig();
 
   const saveFeedback = useCallback(async (): Promise<string | null> => {
+    // 并发保护：已有保存进行中时直接返回，避免重复提交
+    if (savingRef.current) {
+      return null;
+    }
+
     const {
       selectedStudentId,
       selectedThemeId,
@@ -75,6 +84,7 @@ export function useFeedbackSave(options: UseFeedbackSaveOptions) {
       return null;
     }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const student = students.find((s) => s.id === selectedStudentId);
@@ -193,6 +203,10 @@ export function useFeedbackSave(options: UseFeedbackSaveOptions) {
 
       toast.success("反馈已保存");
       clearDraft();
+      // 失效反馈列表缓存，让列表页/详情页重新拉取最新数据
+      await globalMutate(
+        (key) => typeof key === "string" && key.startsWith("/api/feedbacks")
+      );
 
       return savedId || null;
     } catch (error) {
@@ -200,9 +214,10 @@ export function useFeedbackSave(options: UseFeedbackSaveOptions) {
       toast.error(error instanceof Error ? error.message : "保存失败，请重试");
       return null;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, []);
+  }, [globalMutate]);
 
   return { saving, saveFeedback };
 }
