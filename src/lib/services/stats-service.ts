@@ -1,6 +1,6 @@
 import { db } from "@/storage/database/drizzle-client";
 import { students, feedbacks } from "@/storage/database/shared/schema";
-import { eq, inArray, or, isNull, and, gte, desc, count } from "drizzle-orm";
+import { eq, inArray, or, isNull, and, gte, desc, count, sql } from "drizzle-orm";
 import * as authService from "@/lib/services/auth-service";
 import { forbiddenError } from "@/lib/api-error";
 import type { AuthUserResult } from "@/lib/route-auth";
@@ -65,129 +65,142 @@ export async function getStats(user: AuthUserResult): Promise<StatsResult | Resp
     studentFilter
   );
 
+  // 标签使用统计的 SQL 片段：用 jsonb_array_elements 展开数组，UNION ALL 汇总三类标签，
+  // 最后 GROUP BY tag + COUNT FILTER 统计各类出现次数。避免拉全表 JSONB 到内存做 JS 遍历。
+  const tagAccessFilter =
+    accessibleStudentIds && accessibleStudentIds.length > 0
+      ? sql`AND ${feedbacks.studentId} = ANY(${sql.raw(`ARRAY[${accessibleStudentIds.map((id) => `'${id}'`).join(",")}]::text[]`)})`
+      : sql``;
+
   const [
-    studentsCountResult,
-    feedbacksCountResult,
-    thisMonthStudentsResult,
-    thisMonthFeedbacksResult,
-    recentFeedbacksResult,
+    // 合并查询 1：学生总数 + 本月学生数（COUNT FILTER，一次扫描）
+    studentCountsResult,
+    // 合并查询 2：反馈总数 + 本月反馈数
+    feedbackCountsResult,
+    // 查询 3：反馈趋势（SQL GROUP BY DATE，最近 7 天每日计数）
+    feedbackTrendResult,
+    // 查询 4：年级分布（SQL GROUP BY grade）
     gradeDistributionResult,
-    feedbacksDataResult,
+    // 查询 5：标签使用统计（jsonb_array_elements + GROUP BY）
+    tagUsageResult,
+    // 查询 6：最近反馈 + 学员姓名（LEFT JOIN 一次完成，消除串行查询）
     recentFeedbacksListResult,
   ] = await Promise.all([
-    db.select({ value: count() }).from(students).where(activeStudentWhere),
-    db.select({ value: count() }).from(feedbacks).where(feedbackFilter),
     db
-      .select({ value: count() })
-      .from(students)
-      .where(and(activeStudentWhere, gte(students.createdAt, thisMonthStart))),
-    db
-      .select({ value: count() })
-      .from(feedbacks)
-      .where(and(feedbackFilter, gte(feedbacks.createdAt, thisMonthStart))),
-    db
-      .select({ createdAt: feedbacks.createdAt })
-      .from(feedbacks)
-      .where(and(feedbackFilter, gte(feedbacks.createdAt, sevenDaysAgo)))
-      .orderBy(feedbacks.createdAt),
-    db
-      .select({ grade: students.grade })
+      .select({
+        total: count(),
+        thisMonth: sql<number>`count(*) filter (where ${students.createdAt} >= ${thisMonthStart})`,
+      })
       .from(students)
       .where(activeStudentWhere),
     db
       .select({
-        strengths: feedbacks.strengths,
-        weaknesses: feedbacks.weaknesses,
-        improvements: feedbacks.improvements,
+        total: count(),
+        thisMonth: sql<number>`count(*) filter (where ${feedbacks.createdAt} >= ${thisMonthStart})`,
       })
       .from(feedbacks)
       .where(feedbackFilter),
+    db
+      .select({
+        date: sql<string>`to_char(${feedbacks.createdAt}::date, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(feedbacks)
+      .where(and(feedbackFilter, gte(feedbacks.createdAt, sevenDaysAgo)))
+      .groupBy(sql`${feedbacks.createdAt}::date`)
+      .orderBy(sql`${feedbacks.createdAt}::date`),
+    db
+      .select({
+        grade: sql<string>`coalesce(${students.grade}, '未设置')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(students)
+      .where(activeStudentWhere)
+      .groupBy(students.grade),
+    db.execute(sql`
+      WITH tags AS (
+        SELECT elem->>'tag' AS tag, 'strength' AS kind
+        FROM feedbacks, jsonb_array_elements(strengths) AS elem
+        WHERE strengths IS NOT NULL AND jsonb_array_length(strengths) > 0 ${tagAccessFilter}
+        UNION ALL
+        SELECT elem->>'tag', 'improvement'
+        FROM feedbacks, jsonb_array_elements(improvements) AS elem
+        WHERE improvements IS NOT NULL AND jsonb_array_length(improvements) > 0 ${tagAccessFilter}
+        UNION ALL
+        SELECT elem->>'tag', 'weakness'
+        FROM feedbacks, jsonb_array_elements(weaknesses) AS elem
+        WHERE weaknesses IS NOT NULL AND jsonb_array_length(weaknesses) > 0 ${tagAccessFilter}
+      )
+      SELECT tag,
+        count(*) filter (where kind = 'strength')::int AS strength,
+        count(*) filter (where kind = 'improvement')::int AS improvement,
+        count(*) filter (where kind = 'weakness')::int AS weakness
+      FROM tags
+      WHERE tag IS NOT NULL AND tag <> ''
+      GROUP BY tag
+      ORDER BY (count(*) filter (where kind = 'strength')
+              + count(*) filter (where kind = 'improvement')
+              + count(*) filter (where kind = 'weakness')) DESC
+      LIMIT 10
+    `),
     db
       .select({
         id: feedbacks.id,
         createdAt: feedbacks.createdAt,
         studentId: feedbacks.studentId,
         status: feedbacks.status,
+        studentName: students.name,
       })
       .from(feedbacks)
+      .leftJoin(students, eq(feedbacks.studentId, students.id))
       .where(feedbackFilter)
       .orderBy(desc(feedbacks.createdAt))
       .limit(5),
   ]);
 
-  // 获取最近反馈对应的学员名称
-  const recentStudentIds = recentFeedbacksListResult.map((f) => f.studentId);
-  const studentsInfo = recentStudentIds.length > 0
-    ? await db
-        .select({ id: students.id, name: students.name })
-        .from(students)
-        .where(and(inArray(students.id, recentStudentIds), or(eq(students.isActive, true), isNull(students.isActive))))
-    : [];
-  const studentMap = new Map(studentsInfo.map((s) => [s.id, s.name]));
-
-  // 按天分组统计反馈趋势（最近 7 天）
-  const feedbackTrend: Record<string, number> = {};
+  // 用 7 天模板补零（SQL 只返回有数据的天）
+  const trendMap = new Map(feedbackTrendResult.map((r) => [r.date, r.count]));
+  const feedbackTrend: Array<{ date: string; count: number }> = [];
   for (let i = 6; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split("T")[0];
-    feedbackTrend[dateStr] = 0;
+    feedbackTrend.push({ date: dateStr, count: trendMap.get(dateStr) ?? 0 });
   }
-  recentFeedbacksResult.forEach((f) => {
-    if (!f.createdAt) return;
-    const dateStr = new Date(f.createdAt).toISOString().split("T")[0];
-    if (feedbackTrend[dateStr] !== undefined) {
-      feedbackTrend[dateStr]++;
-    }
-  });
 
-  // 学员年级分布
-  const gradeDistribution: Record<string, number> = {};
-  gradeDistributionResult.forEach((s) => {
-    const grade = s.grade || "未设置";
-    gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
-  });
-
-  // 标签使用统计
-  const tagUsage: Record<string, { strength: number; improvement: number; weakness: number }> = {};
-  feedbacksDataResult.forEach((f) => {
-    (f.strengths as Array<{ tag: string }>)?.forEach((s) => {
-      if (!tagUsage[s.tag]) tagUsage[s.tag] = { strength: 0, improvement: 0, weakness: 0 };
-      tagUsage[s.tag].strength++;
-    });
-    (f.improvements as Array<{ tag: string }>)?.forEach((i) => {
-      if (!tagUsage[i.tag]) tagUsage[i.tag] = { strength: 0, improvement: 0, weakness: 0 };
-      tagUsage[i.tag].improvement++;
-    });
-    (f.weaknesses as Array<{ tag: string }>)?.forEach((w) => {
-      if (!tagUsage[w.tag]) tagUsage[w.tag] = { strength: 0, improvement: 0, weakness: 0 };
-      tagUsage[w.tag].weakness++;
-    });
-  });
+  const tagUsageRows = (tagUsageResult as unknown as { rows: Array<{
+    tag: string;
+    strength: number;
+    improvement: number;
+    weakness: number;
+  }> }).rows;
+  const tagUsage = tagUsageRows.map((r) => ({
+    tag: r.tag,
+    strength: r.strength,
+    improvement: r.improvement,
+    weakness: r.weakness,
+    total: r.strength + r.improvement + r.weakness,
+  }));
 
   const recentFeedbacksWithName = recentFeedbacksListResult.map((f) => ({
     id: f.id,
     created_at: f.createdAt,
     student_id: f.studentId,
     status: f.status,
-    student_name: studentMap.get(f.studentId) || "未知学员",
+    student_name: f.studentName || "未知学员",
   }));
 
   const result: StatsResult = {
-    studentCount: studentsCountResult[0]?.value ?? 0,
-    feedbackCount: feedbacksCountResult[0]?.value ?? 0,
-    thisMonthStudents: thisMonthStudentsResult[0]?.value ?? 0,
-    thisMonthFeedbacks: thisMonthFeedbacksResult[0]?.value ?? 0,
-    feedbackTrend: Object.entries(feedbackTrend).map(([date, count]) => ({ date, count })),
-    gradeDistribution: Object.entries(gradeDistribution).map(([grade, count]) => ({ grade, count })),
-    tagUsage: Object.entries(tagUsage)
-      .map(([tag, counts]) => ({
-        tag,
-        ...counts,
-        total: counts.strength + counts.improvement + counts.weakness,
-      }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10),
+    studentCount: studentCountsResult[0]?.total ?? 0,
+    feedbackCount: feedbackCountsResult[0]?.total ?? 0,
+    thisMonthStudents: studentCountsResult[0]?.thisMonth ?? 0,
+    thisMonthFeedbacks: feedbackCountsResult[0]?.thisMonth ?? 0,
+    feedbackTrend,
+    gradeDistribution: gradeDistributionResult.map((r) => ({
+      grade: r.grade,
+      count: r.count,
+    })),
+    tagUsage,
     recentFeedbacks: recentFeedbacksWithName,
   };
 

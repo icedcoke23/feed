@@ -161,19 +161,22 @@ export function useHomeData() {
     });
   }, [students, debouncedSearchQuery, teacherFilter]);
 
+  // 统计：total 用分页元数据的真实总数（students 只是当前页，limit=50），
+  // thisMonth 基于当前已加载页近似计算（首页次要指标，精确值见 /dashboard 的 /api/stats）
   const stats = useMemo(() => {
+    const now = new Date();
     return {
-      total: students.length,
-      thisMonth: students.filter(
-        (s) => {
-          const createdDate = new Date(s.created_at);
-          const now = new Date();
-          return createdDate.getMonth() === now.getMonth() && createdDate.getFullYear() === now.getFullYear();
-        }
-      ).length,
+      total: studentsPagination?.total ?? students.length,
+      thisMonth: students.filter((s) => {
+        const createdDate = new Date(s.created_at);
+        return (
+          createdDate.getMonth() === now.getMonth() &&
+          createdDate.getFullYear() === now.getFullYear()
+        );
+      }).length,
       classes: classes.length,
     };
-  }, [students, classes]);
+  }, [students, classes, studentsPagination]);
 
   const toggleClassExpand = (classId: string) => {
     setExpandedClasses(prev => ({

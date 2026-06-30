@@ -7,6 +7,7 @@ import { eq, inArray, and, or, isNull } from "drizzle-orm";
 import * as repo from "@/lib/repositories/feedback-repository";
 import * as studentRepo from "@/lib/repositories/student-repository";
 import * as authService from "@/lib/services/auth-service";
+import { clearStatsCache } from "@/lib/services/stats-service";
 import { buildPaginationMeta } from "@/lib/pagination";
 import {
   forbiddenError,
@@ -368,7 +369,9 @@ export async function create(user: AuthUserResult, input: CreateFeedbackInput) {
   }
 
   const payload = buildCreatePayload(input, studentId, user.userId);
-  return repo.create(payload);
+  const result = await repo.create(payload);
+  clearStatsCache();
+  return result;
 }
 
 export async function update(
@@ -405,6 +408,7 @@ export async function update(
   });
 
   if (result instanceof Response) return result;
+  clearStatsCache();
   return result;
 }
 
@@ -416,4 +420,5 @@ export async function remove(user: AuthUserResult, id: string) {
   if (!allowed) return forbiddenError("权限不足");
 
   await repo.remove(id);
+  clearStatsCache();
 }

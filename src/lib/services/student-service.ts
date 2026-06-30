@@ -10,6 +10,7 @@ import {
 import { eq, inArray, and, or, isNull, desc } from "drizzle-orm";
 import * as repo from "@/lib/repositories/student-repository";
 import * as authService from "@/lib/services/auth-service";
+import { clearStatsCache } from "@/lib/services/stats-service";
 import { buildPaginationMeta } from "@/lib/pagination";
 import {
   forbiddenError,
@@ -302,6 +303,7 @@ export async function create(user: AuthUserResult, payload: InsertStudent) {
   if (!isAdmin(user)) return forbiddenError("权限不足");
   const student = await repo.create({ ...payload, isActive: true });
   const [enriched] = await enrichStudents([student]);
+  clearStatsCache();
   return enriched;
 }
 
@@ -341,6 +343,7 @@ export async function remove(user: AuthUserResult, id: string) {
   if (!allowed) return forbiddenError("权限不足");
 
   await repo.update(id, { isActive: false, updatedAt: new Date() });
+  clearStatsCache();
 }
 
 export async function history(user: AuthUserResult, id: string) {
@@ -497,6 +500,8 @@ export async function transfer(
     });
   });
 
+  clearStatsCache();
+
   return {
     ...toSnakeCaseStudent(student),
     class_id: targetClass.id,
@@ -558,5 +563,6 @@ export async function batchCreate(
   }));
 
   const data = await db.insert(students).values(toInsert).returning();
+  clearStatsCache();
   return { data, count: data.length };
 }
