@@ -69,9 +69,9 @@ describe("GET /api/auth/me", () => {
 
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.data.id).toBe("u-me");
-    expect(json.data.username).toBe("me-admin");
-    expect(json.data.name).toBe("Me Admin");
-    expect(json.data.role).toBe("admin");
+    expect(json.data.user.id).toBe("u-me");
+    expect(json.data.user.username).toBe("me-admin");
+    expect(json.data.user.name).toBe("Me Admin");
+    expect(json.data.user.role).toBe("admin");
   });
 });

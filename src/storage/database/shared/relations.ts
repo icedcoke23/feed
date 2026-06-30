@@ -4,9 +4,6 @@ import {
   students,
   classes,
   feedbacks,
-  feedbackItems,
-  feedbackAbilityScores,
-  tags,
   classTransfers,
   studentClasses,
 } from "./schema";
@@ -30,7 +27,7 @@ export const studentsRelations = relations(students, ({ one }) => ({
 }));
 
 // 教学反馈 -> 学生、教师
-export const feedbacksRelations = relations(feedbacks, ({ one, many }) => ({
+export const feedbacksRelations = relations(feedbacks, ({ one }) => ({
   student: one(students, {
     fields: [feedbacks.studentId],
     references: [students.id],
@@ -39,32 +36,7 @@ export const feedbacksRelations = relations(feedbacks, ({ one, many }) => ({
     fields: [feedbacks.teacherId],
     references: [teachers.id],
   }),
-  items: many(feedbackItems),
-  abilityScores: many(feedbackAbilityScores),
 }));
-
-// 反馈项目 -> 反馈、标签
-export const feedbackItemsRelations = relations(feedbackItems, ({ one }) => ({
-  feedback: one(feedbacks, {
-    fields: [feedbackItems.feedbackId],
-    references: [feedbacks.id],
-  }),
-  tag: one(tags, {
-    fields: [feedbackItems.tagId],
-    references: [tags.id],
-  }),
-}));
-
-// 能力评分 -> 反馈
-export const feedbackAbilityScoresRelations = relations(
-  feedbackAbilityScores,
-  ({ one }) => ({
-    feedback: one(feedbacks, {
-      fields: [feedbackAbilityScores.feedbackId],
-      references: [feedbacks.id],
-    }),
-  })
-);
 
 // 转班记录 -> 学生、教师
 export const classTransfersRelations = relations(classTransfers, ({ one }) => ({

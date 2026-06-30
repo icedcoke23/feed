@@ -2,6 +2,7 @@ export const HOME_DATA_KEY = "/api/home-data";
 export const STUDENTS_KEY = "/api/students";
 export const CLASSES_KEY = "/api/classes";
 export const TEACHERS_KEY = "/api/teachers";
+export const TEACHERS_ROLE_KEY = "/api/teachers?role=teacher";
 export const ADMIN_TEACHERS_KEY = "/api/teachers?role=admin";
 export const COURSE_STAGES_KEY = "/api/course-stages";
 export const TAGS_KEY = "/api/tags";

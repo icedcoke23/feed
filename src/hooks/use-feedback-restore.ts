@@ -11,7 +11,7 @@ import type {
   FeedbackTeacher,
 } from "@/types/feedback";
 import type { DraftData } from "@/hooks/use-draft-save";
-import { loadTempReportFromLocal, clearTempReport } from "@/lib/pdf-session";
+import { loadTempReport, clearTempReport } from "@/lib/pdf-session";
 
 interface UseFeedbackRestoreOptions {
   editIdFromUrl: string | null;
@@ -95,7 +95,7 @@ export function useFeedbackRestore({
     };
 
     try {
-      const tempData = loadTempReportFromLocal();
+      const tempData = loadTempReport();
       if (tempData) {
         const parsed = tempData;
         setSelectedStudentId(parsed.studentId || "");
@@ -137,7 +137,7 @@ export function useFeedbackRestore({
         if (parsed.studentPhotos) {
           setStudentPhotos(parsed.studentPhotos.map((p: { id: string; url: string }) => ({ id: p.id, url: p.url })));
         }
-        clearTempReport(false);
+        clearTempReport();
         return;
       }
     } catch {

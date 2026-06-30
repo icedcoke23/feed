@@ -5,6 +5,7 @@ import type { BackupData, RestoreSelection } from "@/lib/services/data-service";
 import { handleDbError, forbiddenError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const restoreSchema = z.object({
   data: z.any(),
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (authUser.userRole !== "admin") {
     return forbiddenError("仅管理员可访问");
   }
+
+  // 数据恢复限流：每用户每分钟 2 次（极重操作）
+  const limited = enforceRateLimit(`restore:${authUser.userId}`, 2, 60_000);
+  if (limited) return limited;
 
   try {
     const body = await request.json();

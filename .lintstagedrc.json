@@ -1,5 +1,4 @@
 {
   "*.{ts,tsx}": ["pnpm lint --fix", "bash -c 'pnpm ts-check'"],
-  "*.{js,jsx,mjs,cjs}": ["pnpm lint --fix"],
-  "*.{json,md}": ["prettier --write"]
+  "*.{js,jsx,mjs,cjs}": ["pnpm lint --fix"]
 }

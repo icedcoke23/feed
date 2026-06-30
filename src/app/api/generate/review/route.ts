@@ -6,6 +6,7 @@ import { getAuthUser } from "@/lib/route-auth";
 import { errorResponse } from "@/lib/api-response";
 import { unauthorizedError } from "@/lib/api-error";
 import { sanitizeError } from "@/lib/sensitive-mask";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const reviewSchema = z.object({
   studentName: z.string().max(50).optional(),
@@ -33,6 +34,10 @@ export async function POST(request: NextRequest) {
   if (!authUser) {
     return unauthorizedError("未授权访问");
   }
+
+  // AI 复检限流：每用户每分钟 10 次
+  const limited = enforceRateLimit(`review:${authUser.userId}`, 10, 60_000);
+  if (limited) return limited;
 
   try {
     let body: unknown;

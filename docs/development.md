@@ -32,10 +32,10 @@
 4. 应用数据库迁移：
 
    ```bash
-   DATABASE_URL=postgresql://user:password@localhost:5432/edu_db pnpm exec drizzle-kit migrate
+   pnpm db:migrate
    ```
 
-   > 项目未在 `package.json` 中提供 `db:migrate` 脚本，直接使用 `drizzle-kit migrate` 即可。
+   > `package.json` 已提供 `db:migrate` 与 `db:generate` 脚本，分别对应 `drizzle-kit migrate` 与 `drizzle-kit generate`。`DATABASE_URL` 需在 `.env` 中配置。
 
 5. 启动开发服务器：
 
@@ -47,17 +47,17 @@
 
 ## 常用命令
 
-| 命令                       | 说明                                 |
-| -------------------------- | ------------------------------------ |
-| `pnpm dev`                 | 启动 Next.js 开发服务器（端口 5000） |
-| `pnpm lint`                | 运行 ESLint 检查代码风格             |
-| `pnpm ts-check`            | 运行 TypeScript 类型检查             |
-| `pnpm test`                | 运行单元/集成测试（Vitest）          |
-| `pnpm test:e2e`            | 运行端到端测试（Playwright）         |
-| `pnpm build`               | 构建生产版本                         |
-| `pnpm import:schedule`     | 执行课表导入脚本                     |
-| `pnpm import:schedule:dry` | 课表导入脚本空跑                     |
-| `pnpm db:check`            | 检查 Drizzle 迁移文件一致性          |
+| 命令              | 说明                                  |
+| ----------------- | ------------------------------------- |
+| `pnpm dev`        | 启动 Next.js 开发服务器（端口 5000）  |
+| `pnpm lint`       | 运行 ESLint 检查代码风格              |
+| `pnpm ts-check`   | 运行 TypeScript 类型检查              |
+| `pnpm test`       | 运行单元/集成测试（Vitest）           |
+| `pnpm test:e2e`   | 运行端到端测试（Playwright）          |
+| `pnpm build`      | 构建生产版本                          |
+| `pnpm db:check`   | 检查 Drizzle 迁移文件一致性           |
+| `pnpm db:generate`| 根据 schema 生成新的迁移文件          |
+| `pnpm db:migrate` | 应用迁移到数据库                      |
 
 ## 补充说明
 

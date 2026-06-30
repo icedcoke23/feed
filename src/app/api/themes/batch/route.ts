@@ -7,6 +7,7 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { sanitizeError } from "@/lib/sensitive-mask";
 import * as themeService from "@/lib/services/theme-service";
 import type { TeachingTheme } from "@/storage/database/shared/schema";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const themeItemSchema = z.object({
   name: z.string().min(1, "主题名称不能为空"),
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
   if (!authUser) {
     return errorResponse("未授权访问", 401);
   }
+
+  // 批量添加主题限流：每用户每分钟 5 次
+  const limited = enforceRateLimit(`batch-themes:${authUser.userId}`, 5, 60_000);
+  if (limited) return limited;
 
   const body = await request.json();
 

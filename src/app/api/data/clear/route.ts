@@ -3,6 +3,7 @@ import * as dataService from "@/lib/services/data-service";
 import { handleDbError, forbiddenError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 // DELETE /api/data/clear - 清空所有业务数据
 export async function DELETE(request: NextRequest) {
@@ -14,6 +15,10 @@ export async function DELETE(request: NextRequest) {
   if (authUser.userRole !== "admin") {
     return forbiddenError("仅管理员可执行此操作");
   }
+
+  // 清空数据限流：每用户每分钟 2 次（破坏性操作）
+  const limited = enforceRateLimit(`data-clear:${authUser.userId}`, 2, 60_000);
+  if (limited) return limited;
 
   try {
     const result = await dataService.clearAll();

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, signToken, COOKIE_NAME } from "@/lib/auth";
-import { jwtVerify } from "jose";
+import { decodeJwt } from "jose";
 
 // 不需要认证的路径
-const PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout'];
+const PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout', '/api/health'];
 
 // 仅管理员可访问的 API 路径前缀
 const ADMIN_ONLY_API_PREFIXES = [
@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // 验证 Token
+  // 验证 Token（verifyToken 内部使用 auth.ts 的 getJwtSecret，生产环境无 secret 会抛错）
   const payload = await verifyToken(token);
   if (!payload) {
     if (pathname.startsWith('/api/')) {
@@ -64,8 +64,8 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const userId = payload.userId as string;
-  const role = payload.role as string;
+  const userId = payload.userId;
+  const role = payload.role;
 
   // 检查管理员权限
   const isAdminOnlyApi = ADMIN_ONLY_API_PREFIXES.some(prefix => pathname.startsWith(prefix));
@@ -85,9 +85,9 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
   // Token 续签：检查剩余有效期，不足 50% 则签发新 Token
+  // 注意：此处用 decodeJwt 仅读取 exp/iat（无需再次验签，前面 verifyToken 已验证签名）
   try {
-    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET || "dev-only-jwt-secret-change-in-production");
-    const { payload: decoded } = await jwtVerify(token, secretKey);
+    const decoded = decodeJwt(token);
     const exp = decoded.exp;
     const iat = decoded.iat;
     if (exp && iat) {
@@ -96,7 +96,7 @@ export async function middleware(request: NextRequest) {
       const remaining = exp - now;
       // 剩余有效期不足 50%，签发新 Token
       if (remaining < totalLifetime * 0.5) {
-        const newToken = await signToken({ userId, role: role as "admin" | "teacher" });
+        const newToken = await signToken({ userId, role });
         // 设置 X-New-Token 响应头，前端可据此更新
         response.headers.set("X-New-Token", newToken);
         // 同时更新 Cookie

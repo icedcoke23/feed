@@ -7,6 +7,7 @@ import http from "http";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import * as aiSettingService from "@/lib/services/ai-setting-service";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const testSchema = z.object({
   api_key: z.string().min(1),
@@ -29,6 +30,10 @@ export async function POST(request: NextRequest) {
   if (!authUser) {
     return errorResponse("未授权访问", 401);
   }
+
+  // AI 连接测试限流：每用户每分钟 3 次（外部请求，有 15s 超时）
+  const limited = enforceRateLimit(`ai-test:${authUser.userId}`, 3, 60_000);
+  if (limited) return limited;
 
   try {
     const body = await request.json();

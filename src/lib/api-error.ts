@@ -7,9 +7,53 @@ export function apiError(message: string, status: number = 500, code?: string): 
   return errorResponse(message, status, code);
 }
 
-// 数据库错误处理 - 生产环境不暴露内部错误详情
+// PostgreSQL 错误码到业务错误码的映射
+// 参考 https://www.postgresql.org/docs/current/errcodes-appendix.html
+const PG_ERROR_CODE_MAP: Record<string, { code: string; status: number; message: string }> = {
+  "23505": { code: "UNIQUE_VIOLATION", status: 409, message: "记录已存在" },
+  "23503": { code: "FOREIGN_KEY_VIOLATION", status: 400, message: "关联记录不存在" },
+  "23514": { code: "CHECK_VIOLATION", status: 400, message: "数据不满足约束" },
+  "23502": { code: "NOT_NULL_VIOLATION", status: 400, message: "必填字段缺失" },
+  // 重复键冲突的另一种错误码（部分驱动用 23P01）
+  "23P01": { code: "UNIQUE_VIOLATION", status: 409, message: "记录已存在" },
+};
+
+interface PgErrorLike {
+  code?: string;
+  constraint?: string;
+  detail?: string;
+  message?: string;
+}
+
+// 从错误对象中提取 PostgreSQL 错误码
+function extractPgCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const e = error as PgErrorLike;
+  // pg 库的错误对象在 error.code 上
+  if (typeof e.code === "string" && /^\d{5}$/.test(e.code)) {
+    return e.code;
+  }
+  return undefined;
+}
+
+// 数据库错误处理 - 识别 PostgreSQL 错误码并转换为业务错误码
 export function handleDbError(error: unknown, context: string = "操作"): NextResponse {
   console.error(`[${context}] DB error:`, sanitizeError(error));
+
+  // 优先识别 PostgreSQL 错误码
+  const pgCode = extractPgCode(error);
+  if (pgCode && PG_ERROR_CODE_MAP[pgCode]) {
+    const mapping = PG_ERROR_CODE_MAP[pgCode];
+    // 开发环境附带约束名等调试信息
+    const details =
+      process.env.NODE_ENV === "production"
+        ? undefined
+        : {
+            constraint: (error as PgErrorLike).constraint,
+            dbCode: pgCode,
+          };
+    return errorResponse(`${context}失败: ${mapping.message}`, mapping.status, mapping.code, details);
+  }
 
   if (process.env.NODE_ENV === "production") {
     return apiError(`${context}失败，请稍后重试`, 500);

@@ -31,6 +31,7 @@
 - `src/app/api/auth/login/__tests__/route.test.ts`
 - `src/lib/repositories/__tests__/user-repository.test.ts`
 - `src/lib/services/__tests__/lookup-service.test.ts`
+- `src/lib/__tests__/rate-limit.test.ts`
 - `src/components/ui/__tests__/button.test.tsx`
 - `e2e/auth.spec.ts`
 - `e2e/home.spec.ts`
@@ -42,10 +43,10 @@
 pnpm test
 
 # 查看测试覆盖率（阈值：lines/functions/statements 各 15%，branches 8%）
-pnpm test:coverage
+pnpm vitest run --coverage
 
 # 监听模式开发测试
-pnpm test:watch
+pnpm vitest
 
 # 运行 Playwright E2E 测试
 pnpm test:e2e
@@ -53,7 +54,7 @@ pnpm test:e2e
 
 ## 编写测试注意事项
 
-- API Route 测试请为每个用例使用独立 IP（通过 `x-forwarded-for`），避免登录接口的 rate limit 计数互相污染。
+- API Route 测试请为每个用例使用独立 IP（通过 `x-forwarded-for`），避免登录接口的 rate limit 计数互相污染。rate limit 已扩展到 AI 生成、数据导入、批量操作等路由，测试这些路由时同样需要注意限流计数。
 - 组件测试默认使用 jsdom 环境，已在 `vitest.config.ts` 中全局配置。
 - 通用初始化逻辑可放在 `src/test/setup.ts`。
 

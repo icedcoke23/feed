@@ -1,11 +1,5 @@
 import { toast } from "sonner";
-
-// API响应类型
-export interface ApiResponse<T = unknown> {
-  data?: T;
-  error?: string;
-  message?: string;
-}
+import { ApiResponse } from "@/lib/api-types";
 
 // API请求配置
 interface RequestOptions extends RequestInit {

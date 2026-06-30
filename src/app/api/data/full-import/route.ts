@@ -4,6 +4,7 @@ import type { ImportData } from "@/lib/repositories/data-repository";
 import { handleDbError, forbiddenError } from "@/lib/api-error";
 import { getAuthUser } from "@/lib/route-auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 // POST /api/data/full-import - 完整导入数据（保留原 ID，先清空再导入）
 export async function POST(request: NextRequest) {
@@ -15,6 +16,10 @@ export async function POST(request: NextRequest) {
   if (authUser.userRole !== "admin") {
     return forbiddenError("仅管理员可访问");
   }
+
+  // 全量导入限流：每用户每分钟 2 次（极重操作，先清空再导入）
+  const limited = enforceRateLimit(`full-import:${authUser.userId}`, 2, 60_000);
+  if (limited) return limited;
 
   try {
     const body = await request.json();

@@ -89,7 +89,8 @@ describe("POST /api/auth/login", () => {
 
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.data.username).toBe("admin");
+    expect(json.data.user.username).toBe("admin");
+    expect(json.data.user.role).toBe("admin");
     expect(json.message).toBe("登录成功");
 
     const cookie = (res as NextResponse).cookies.get("auth_token");

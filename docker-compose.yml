@@ -25,7 +25,8 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/feedback_db
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      # JWT_SECRET 必须显式提供，不设默认值以避免生产环境误用弱密钥
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required, generate with: openssl rand -hex 32}
       ADMIN_DEFAULT_PASSWORD: ${ADMIN_DEFAULT_PASSWORD:-}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       COZE_API_KEY: ${COZE_API_KEY:-}
