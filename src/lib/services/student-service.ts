@@ -11,6 +11,7 @@ import { eq, inArray, and, or, isNull, desc } from "drizzle-orm";
 import * as repo from "@/lib/repositories/student-repository";
 import * as authService from "@/lib/services/auth-service";
 import { clearStatsCache } from "@/lib/services/stats-service";
+import { toSnakeCaseFeedback } from "@/lib/services/feedback-service";
 import { buildPaginationMeta } from "@/lib/pagination";
 import {
   forbiddenError,
@@ -294,8 +295,17 @@ export async function findById(user: AuthUserResult, id: string) {
 
   return {
     ...enriched,
-    feedbacks: feedbacksList,
-    transfers: transfersList,
+    feedbacks: feedbacksList.map(toSnakeCaseFeedback),
+    transfers: transfersList.map((t) => ({
+      id: t.id,
+      student_id: t.studentId,
+      from_teacher_id: t.fromTeacherId,
+      to_teacher_id: t.toTeacherId,
+      from_class: t.fromClass,
+      to_class: t.toClass,
+      reason: t.reason,
+      transferred_at: t.transferredAt,
+    })),
   };
 }
 

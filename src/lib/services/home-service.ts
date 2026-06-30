@@ -146,7 +146,23 @@ async function enrichStudents(studentsData: typeof students.$inferSelect[]) {
   ]);
 
   const classesMap = new Map(classesInfo.map((c) => [c.id, c]));
-  const teachersMap = new Map(adminTeachersInfo.map((t) => [t.id, t]));
+
+  // 补查班级教师：classesInfo 中的 teacherId 对应的教师不在 adminTeachersInfo 中，
+  // 需额外查询并合并到 teachersMap，否则班级教师字段静默为 null。
+  const classTeacherIds = [
+    ...new Set(classesInfo.map((c) => c.teacherId).filter(Boolean)),
+  ] as string[];
+  const classTeachersInfo =
+    classTeacherIds.length > 0
+      ? await db
+          .select({ id: teachers.id, name: teachers.name, phone: teachers.phone })
+          .from(teachers)
+          .where(inArray(teachers.id, classTeacherIds))
+      : [];
+  const teachersMap = new Map([
+    ...adminTeachersInfo.map((t) => [t.id, t] as const),
+    ...classTeachersInfo.map((t) => [t.id, t] as const),
+  ]);
   const relationsByStudent = new Map<string, typeof studentClassRelations>();
   studentClassRelations.forEach((rel) => {
     if (!relationsByStudent.has(rel.studentId)) relationsByStudent.set(rel.studentId, []);
