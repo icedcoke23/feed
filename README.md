@@ -55,10 +55,12 @@ pnpm start
 | `pnpm lint` | 运行 ESLint 检查代码风格 |
 | `pnpm ts-check` | 运行 TypeScript 类型检查（`tsc`） |
 | `pnpm test` | 运行 vitest 单元/集成测试 |
-| `pnpm test:e2e` | 运行 Playwright 端到端测试 |
+| `pnpm test:typecheck` | 测试文件类型检查（独立 tsconfig，包含测试文件） |
+| `pnpm test:e2e` | 运行 Playwright 端到端测试（需配置 `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD`） |
 | `pnpm db:check` | 检查 Drizzle 迁移文件一致性 |
 | `pnpm db:generate` | 根据 schema 生成新的迁移文件 |
 | `pnpm db:migrate` | 应用迁移到数据库 |
+| `node scripts/init-admin.js` | 初始化 admin 账户（CI/首次部署使用，需 `DATABASE_URL`） |
 
 ## 项目结构
 

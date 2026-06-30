@@ -1,0 +1,51 @@
+version: 2
+updates:
+  # 监控 npm（pnpm）依赖
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 10
+    # 仅监控生产依赖（devDependencies 由人工审查，避免频繁更新破坏构建）
+    allow:
+      - dependency-type: "production"
+    # 安全更新优先
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    # 分组更新，减少 PR 数量
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "next"
+          - "@radix-ui/*"
+      drizzle:
+        patterns:
+          - "drizzle-*"
+      aws-sdk:
+        patterns:
+          - "@aws-sdk/*"
+    reviewers:
+      - "trae-automation"
+
+  # 监控 GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "automated"

@@ -218,30 +218,36 @@ export function AISettingsPanel({
                     </div>
 
                     <div className="space-y-2">
-                      <Label>API密钥 <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="ai-settings-api-key">API密钥 <span className="text-red-500">*</span></Label>
                       <Input
+                        id="ai-settings-api-key"
                         type="password"
                         value={aiSettings.api_key}
                         onChange={(e) => onSettingsChange({ ...aiSettings, api_key: e.target.value })}
                         placeholder="请输入AI API密钥"
+                        aria-required="true"
                       />
                       <p className="text-xs text-gray-500">第三方AI服务的API密钥</p>
                     </div>
                     <div className="space-y-2">
-                      <Label>API接入地址 <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="ai-settings-base-url">API接入地址 <span className="text-red-500">*</span></Label>
                       <Input
+                        id="ai-settings-base-url"
                         value={aiSettings.base_url}
                         onChange={(e) => onSettingsChange({ ...aiSettings, base_url: e.target.value })}
                         placeholder="https://api.openai.com/v1"
+                        aria-required="true"
                       />
                       <p className="text-xs text-gray-500">第三方AI服务的API基础URL地址（如：https://api.openai.com/v1）</p>
                     </div>
                     <div className="space-y-2">
-                      <Label>模型ID <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="ai-settings-model-id">模型ID <span className="text-red-500">*</span></Label>
                       <Input
+                        id="ai-settings-model-id"
                         value={aiSettings.model_id}
                         onChange={(e) => onSettingsChange({ ...aiSettings, model_id: e.target.value })}
                         placeholder="如：gpt-3.5-turbo, gpt-4"
+                        aria-required="true"
                       />
                       <p className="text-xs text-gray-500">使用的AI模型标识符</p>
                     </div>
@@ -263,8 +269,9 @@ export function AISettingsPanel({
                 {/* 通用设置 */}
                 <div className="space-y-4 max-w-xl">
                   <div className="space-y-2">
-                    <Label>最大并发数</Label>
+                    <Label htmlFor="ai-settings-max-concurrent">最大并发数</Label>
                     <Input
+                      id="ai-settings-max-concurrent"
                       type="number"
                       value={aiSettings.max_concurrent}
                       onChange={(e) => onSettingsChange({ ...aiSettings, max_concurrent: e.target.value })}
@@ -324,8 +331,9 @@ export function AISettingsPanel({
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  <Label>系统提示词</Label>
+                  <Label htmlFor="ai-settings-system-prompt">系统提示词</Label>
                   <Textarea
+                    id="ai-settings-system-prompt"
                     value={aiSettings.system_prompt}
                     onChange={(e) => onSettingsChange({ ...aiSettings, system_prompt: e.target.value })}
                     placeholder="输入系统提示词..."
@@ -387,8 +395,9 @@ export function AISettingsPanel({
                       <AccordionContent>
                         <div className="space-y-4 pt-2">
                           <div className="space-y-2">
-                            <Label>系统提示词</Label>
+                            <Label htmlFor={`course-prompt-system-prompt-${prompt.id}`}>系统提示词</Label>
                             <Textarea
+                              id={`course-prompt-system-prompt-${prompt.id}`}
                               value={drafts[prompt.id]?.system_prompt || ""}
                               onChange={(e) =>
                                 setDrafts((prev) => ({
@@ -404,8 +413,9 @@ export function AISettingsPanel({
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>报告结构</Label>
+                            <Label htmlFor={`course-prompt-report-structure-${prompt.id}`}>报告结构</Label>
                             <Textarea
+                              id={`course-prompt-report-structure-${prompt.id}`}
                               value={drafts[prompt.id]?.report_structure || ""}
                               onChange={(e) =>
                                 setDrafts((prev) => ({
@@ -421,8 +431,9 @@ export function AISettingsPanel({
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>字数限制</Label>
+                            <Label htmlFor={`course-prompt-word-limit-${prompt.id}`}>字数限制</Label>
                             <Input
+                              id={`course-prompt-word-limit-${prompt.id}`}
                               value={drafts[prompt.id]?.word_limit || ""}
                               onChange={(e) =>
                                 setDrafts((prev) => ({

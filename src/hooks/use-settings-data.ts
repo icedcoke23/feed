@@ -9,6 +9,13 @@ import { getDefaultPrompt } from "@/lib/constants/ai";
 import type { ConfirmDialogState } from "@/components/business/confirm-dialog";
 import { INITIAL_CONFIRM_STATE, createConfirmState } from "@/components/business/confirm-dialog";
 import { fetcher, COURSE_STAGES_KEY, TAGS_KEY, THEMES_KEY, AI_SETTINGS_KEY, USERS_KEY } from "@/lib/swr";
+import {
+  courseStageFormSchema,
+  tagFormSchema,
+  themeFormSchema,
+  validateUserForm,
+  firstZodError,
+} from "@/lib/validations/client";
 
 // ============ useCourseStages ============
 
@@ -24,10 +31,12 @@ export function useCourseStages() {
   const saveCourseStage = useCallback(async (editingStage: Partial<CourseStage>, isAdding: boolean) => {
     void isAdding;
 
-    if (!editingStage.stage_name || !editingStage.theme || !editingStage.level) {
-      toast.error("请填写必填项");
+    const parsed = courseStageFormSchema.safeParse(editingStage);
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return false;
     }
+    const valid = parsed.data;
 
     setSaving(true);
     try {
@@ -37,14 +46,14 @@ export function useCourseStages() {
 
       const body = isNew
         ? {
-            stageCode: editingStage.stage_code || `${editingStage.theme.toLowerCase()}_${editingStage.level}`,
-            stageName: editingStage.stage_name,
-            theme: editingStage.theme,
-            level: editingStage.level,
-            description: editingStage.description,
-            content: editingStage.content,
-            goal: editingStage.goal,
-            sortOrder: editingStage.sort_order || 0,
+            stageCode: editingStage.stage_code || `${valid.theme.toLowerCase()}_${valid.level}`,
+            stageName: valid.stage_name,
+            theme: valid.theme,
+            level: valid.level,
+            description: valid.description,
+            content: valid.content,
+            goal: valid.goal,
+            sortOrder: valid.sort_order,
           }
         : editingStage;
 
@@ -104,26 +113,35 @@ export function useCourseStages() {
         setConfirmDialog(prev => ({ ...prev, open: false }));
         setSaving(true);
         try {
-          let successCount = 0;
-          for (const preset of DEFAULT_PRESETS) {
-            const response = await fetch("/api/course-stages", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({
-                stageCode: preset.stage_code,
-                stageName: preset.stage_name,
-                theme: preset.theme,
-                level: preset.level,
-                description: preset.description,
-                content: preset.content,
-                goal: preset.goal,
-                sortOrder: preset.sort_order,
-              }),
-            });
-            if (response.ok) successCount++;
+          // 并行发起所有预设创建请求，单个失败不影响其他
+          const results = await Promise.allSettled(
+            DEFAULT_PRESETS.map((preset) =>
+              fetch("/api/course-stages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                  stageCode: preset.stage_code,
+                  stageName: preset.stage_name,
+                  theme: preset.theme,
+                  level: preset.level,
+                  description: preset.description,
+                  content: preset.content,
+                  goal: preset.goal,
+                  sortOrder: preset.sort_order,
+                }),
+              }).then((res) => res.ok)
+            )
+          );
+          const successCount = results.filter(
+            (r) => r.status === "fulfilled" && r.value
+          ).length;
+          const failedCount = results.length - successCount;
+          if (failedCount === 0) {
+            toast.success(`成功添加 ${successCount} 个预设`);
+          } else {
+            toast.error(`添加完成：成功 ${successCount} 个，失败 ${failedCount} 个`);
           }
-          toast.success(`成功添加 ${successCount} 个预设`);
           mutate();
         } catch {
           toast.error("添加预设失败");
@@ -195,10 +213,12 @@ export function useTags() {
   const saveTag = useCallback(async (editingTag: Partial<Tag>, isAddingTag: boolean) => {
     void isAddingTag;
 
-    if (!editingTag.name || !editingTag.category) {
-      toast.error("请填写标签名称和分类");
+    const parsed = tagFormSchema.safeParse(editingTag);
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return false;
     }
+    const valid = parsed.data;
 
     setSaving(true);
     try {
@@ -208,14 +228,14 @@ export function useTags() {
 
       const body = isNew
         ? {
-            category: editingTag.category,
-            name: editingTag.name,
-            description: editingTag.description || "",
-            sortOrder: editingTag.sort_order || 0,
+            category: valid.category,
+            name: valid.name,
+            description: valid.description,
+            sortOrder: valid.sort_order,
           }
         : {
-            category: editingTag.category,
-            name: editingTag.name,
+            category: valid.category,
+            name: valid.name,
             description: editingTag.description,
             sortOrder: editingTag.sort_order,
           };
@@ -294,10 +314,16 @@ export function useThemes() {
   const saveTheme = useCallback(async (editingTheme: Partial<Theme>, isAddingTheme: boolean) => {
     void isAddingTheme;
 
-    if (!editingTheme.name) {
-      toast.error("请填写主题名称");
+    // theme 编辑时 category 可能为空，使用 default 兜底
+    const parsed = themeFormSchema.safeParse({
+      ...editingTheme,
+      category: editingTheme.category || "default",
+    });
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return false;
     }
+    const valid = parsed.data;
 
     setSaving(true);
     try {
@@ -307,14 +333,14 @@ export function useThemes() {
 
       const body = isNew
         ? {
-            name: editingTheme.name,
-            category: editingTheme.category || "default",
-            description: editingTheme.description || "",
-            sortOrder: editingTheme.sort_order || 0,
+            name: valid.name,
+            category: valid.category,
+            description: valid.description,
+            sortOrder: valid.sort_order,
           }
         : {
-            name: editingTheme.name,
-            category: editingTheme.category,
+            name: valid.name,
+            category: valid.category,
             description: editingTheme.description,
             sortOrder: editingTheme.sort_order,
           };
@@ -407,6 +433,8 @@ export function useAISettings() {
 
   const saveAISettings = useCallback(async () => {
     setSaving(true);
+    // 记录乐观更新前的值，便于失败时回滚
+    const prevSettings = aiSettings;
     try {
       const response = await fetch("/api/ai-settings", {
         method: "PUT",
@@ -419,9 +447,13 @@ export function useAISettings() {
         toast.success("AI设置保存成功");
         mutate();
       } else {
+        // 乐观回滚：恢复到保存前的状态
+        mutate(prevSettings, { revalidate: false });
         toast.error("保存失败");
       }
     } catch (error) {
+      // 网络异常同样回滚
+      mutate(prevSettings, { revalidate: false });
       console.error("Failed to save AI settings:", error);
       toast.error("保存失败");
     } finally {
@@ -493,6 +525,8 @@ export function useAISettings() {
       variant: "destructive",
       onConfirm: async () => {
         setConfirmDialog(prev => ({ ...prev, open: false }));
+        // 记录乐观更新前的值，便于失败时回滚
+        const prevSettings = aiSettings;
         try {
           const defaultPrompt = getDefaultPrompt();
 
@@ -514,15 +548,19 @@ export function useAISettings() {
             toast.success("提示词已重置为默认值");
             mutate();
           } else {
+            // 乐观回滚：恢复到重置前的提示词
+            mutate(prevSettings, { revalidate: false });
             toast.error("重置提示词失败，保存到数据库时出错");
           }
         } catch (error) {
+          // 网络异常同样回滚
+          mutate(prevSettings, { revalidate: false });
           console.error("Reset prompt error:", error);
           toast.error("重置提示词失败");
         }
       },
     }));
-  }, [setAiSettings, mutate]);
+  }, [aiSettings, setAiSettings, mutate]);
 
   return {
     aiSettings,
@@ -551,15 +589,12 @@ export function useUsers() {
   }, [mutate]);
 
   const saveUser = useCallback(async (editingUser: Partial<UserItem>, isAddingUser: boolean) => {
-    if (!editingUser.username || !editingUser.name) {
-      toast.error("请填写用户名和姓名");
+    const parsed = validateUserForm(editingUser, isAddingUser);
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return false;
     }
-
-    if (isAddingUser && !editingUser.password) {
-      toast.error("请设置初始密码");
-      return false;
-    }
+    const valid = parsed.data;
 
     setSaving(true);
     try {
@@ -569,18 +604,18 @@ export function useUsers() {
 
       const body = isNew
         ? {
-            username: editingUser.username,
-            password: editingUser.password,
-            name: editingUser.name,
+            username: valid.username,
+            password: valid.password,
+            name: valid.name,
             role: editingUser.role || "teacher",
             teacherRole: editingUser.teacherRole,
-            phone: editingUser.phone || "",
+            phone: valid.phone || "",
           }
         : {
-            name: editingUser.name,
+            name: valid.name,
             role: editingUser.role,
             teacherRole: editingUser.teacherRole,
-            phone: editingUser.phone || "",
+            phone: valid.phone || "",
             password: editingUser.password,
           };
 

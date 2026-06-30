@@ -12,6 +12,7 @@ import type {
   FeedbackStudent,
   FeedbackTeacher,
 } from "@/types/feedback";
+import { feedbackSaveSchema, firstZodError } from "@/lib/validations/client";
 
 export interface UseFeedbackSaveOptions {
   selectedStudentId: string;
@@ -81,6 +82,17 @@ export function useFeedbackSave(options: UseFeedbackSaveOptions) {
 
     if (!selectedStudentId || !generatedReport) {
       toast.error("缺少必要信息，无法保存");
+      return null;
+    }
+
+    // zod 校验：确保 student_id 非空，feedback_date 可选
+    const parsed = feedbackSaveSchema.safeParse({
+      student_id: selectedStudentId,
+      feedback_date: feedbackDate,
+      teacher_id: selectedTeacherId || selectedAdminTeacherId,
+    });
+    if (!parsed.success) {
+      toast.error(firstZodError(parsed.error));
       return null;
     }
 

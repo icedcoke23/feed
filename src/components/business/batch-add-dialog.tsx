@@ -70,9 +70,9 @@ export function BatchAddDialog({
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>分配到班级（可选）</Label>
+            <Label htmlFor="batch-add-class">分配到班级（可选）</Label>
             <Select value={batchClassId || "none"} onValueChange={(v) => onBatchClassIdChange(v === "none" ? "" : v)}>
-              <SelectTrigger>
+              <SelectTrigger id="batch-add-class">
                 <SelectValue placeholder="选择班级（可选）" />
               </SelectTrigger>
               <SelectContent>
@@ -86,8 +86,9 @@ export function BatchAddDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>输入学员信息</Label>
+            <Label htmlFor="batch-add-student-info">输入学员信息</Label>
             <Textarea
+              id="batch-add-student-info"
               placeholder={`支持多种格式，例如：
 张三 3年级2班
 李四 四年级1班

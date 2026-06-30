@@ -199,6 +199,8 @@ export function CourseStageManagement({
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditDialog(stage)}
+                          aria-label="编辑课程阶段"
+                          title="编辑课程阶段"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -207,6 +209,8 @@ export function CourseStageManagement({
                           size="sm"
                           className="text-red-500 hover:text-red-700"
                           onClick={() => onDelete(stage.id)}
+                          aria-label="删除课程阶段"
+                          title="删除课程阶段"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -233,16 +237,19 @@ export function CourseStageManagement({
           <div className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>阶段名称 *</Label>
+                <Label htmlFor="course-stage-name">阶段名称 *</Label>
                 <Input
+                  id="course-stage-name"
                   value={editingStage.stage_name || ""}
                   onChange={(e) => setEditingStage({ ...editingStage, stage_name: e.target.value })}
                   placeholder="如：Scratch初阶"
+                  aria-required="true"
                 />
               </div>
               <div className="space-y-2">
-                <Label>阶段代码</Label>
+                <Label htmlFor="course-stage-code">阶段代码</Label>
                 <Input
+                  id="course-stage-code"
                   value={editingStage.stage_code || ""}
                   onChange={(e) => setEditingStage({ ...editingStage, stage_code: e.target.value })}
                   placeholder="如：scratch_beginner"
@@ -252,7 +259,7 @@ export function CourseStageManagement({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>主题 *</Label>
+                <Label htmlFor="course-stage-theme">主题 *</Label>
                 <Select
                   value={editingStage.theme === "other" || !editingStage.theme ? "other" : (THEME_OPTIONS.some(opt => opt.value === editingStage.theme) ? editingStage.theme : "other")}
                   onValueChange={(v) => {
@@ -264,7 +271,7 @@ export function CourseStageManagement({
                     }
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="course-stage-theme" aria-required="true">
                     <SelectValue placeholder="选择主题" />
                   </SelectTrigger>
                   <SelectContent>
@@ -284,11 +291,12 @@ export function CourseStageManagement({
                     }}
                     placeholder="输入自定义主题"
                     className="mt-2"
+                    aria-label="自定义主题"
                   />
                 )}
               </div>
               <div className="space-y-2">
-                <Label>难度级别 *</Label>
+                <Label htmlFor="course-stage-level">难度级别 *</Label>
                 <Select
                   value={editingStage.level === "other" || !editingStage.level ? "other" : (LEVEL_OPTIONS.some(opt => opt.value === editingStage.level) ? editingStage.level : "other")}
                   onValueChange={(v) => {
@@ -300,7 +308,7 @@ export function CourseStageManagement({
                     }
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="course-stage-level" aria-required="true">
                     <SelectValue placeholder="选择级别" />
                   </SelectTrigger>
                   <SelectContent>
@@ -320,14 +328,16 @@ export function CourseStageManagement({
                     }}
                     placeholder="输入自定义级别"
                     className="mt-2"
+                    aria-label="自定义级别"
                   />
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>描述</Label>
+              <Label htmlFor="course-stage-description">描述</Label>
               <Textarea
+                id="course-stage-description"
                 value={editingStage.description || ""}
                 onChange={(e) => setEditingStage({ ...editingStage, description: e.target.value })}
                 placeholder="简要描述这个阶段的学习内容和目标"
@@ -336,8 +346,9 @@ export function CourseStageManagement({
             </div>
 
             <div className="space-y-2">
-              <Label>教学内容</Label>
+              <Label htmlFor="course-stage-content">教学内容</Label>
               <Textarea
+                id="course-stage-content"
                 value={editingStage.content || ""}
                 onChange={(e) => setEditingStage({ ...editingStage, content: e.target.value })}
                 placeholder="详细列出教学内容，如：实验类型、学科属性、知识点等"
@@ -346,8 +357,9 @@ export function CourseStageManagement({
             </div>
 
             <div className="space-y-2">
-              <Label>项目目标</Label>
+              <Label htmlFor="course-stage-goal">项目目标</Label>
               <Textarea
+                id="course-stage-goal"
                 value={editingStage.goal || ""}
                 onChange={(e) => setEditingStage({ ...editingStage, goal: e.target.value })}
                 placeholder="描述学员完成本阶段后应达到的学习目标和成果"
@@ -356,8 +368,9 @@ export function CourseStageManagement({
             </div>
 
             <div className="space-y-2">
-              <Label>排序</Label>
+              <Label htmlFor="course-stage-sort-order">排序</Label>
               <Input
+                id="course-stage-sort-order"
                 type="number"
                 value={editingStage.sort_order || 0}
                 onChange={(e) => setEditingStage({ ...editingStage, sort_order: parseInt(e.target.value) || 0 })}

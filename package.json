@@ -9,6 +9,7 @@
     "lint": "eslint",
     "start": "bash ./scripts/start.sh",
     "ts-check": "tsc -p tsconfig.json",
+    "test:typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "db:check": "drizzle-kit check",

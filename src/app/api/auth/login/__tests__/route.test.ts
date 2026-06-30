@@ -4,7 +4,6 @@ import { POST as loginHandler } from "../route";
 import { createTestDb } from "@/test/db";
 import { users } from "@/storage/database/shared/schema";
 import { hashPassword } from "@/lib/auth";
-import type { RouteContext } from "@/lib/route-handlers/types";
 
 // 每个测试使用独立 IP，避免 rate limit 计数在测试间互相污染
 const TEST_IPS = ["127.0.0.1", "127.0.0.2", "127.0.0.3"] as const;
@@ -59,7 +58,7 @@ describe("POST /api/auth/login", () => {
 
   test("缺少字段返回 400", async () => {
     const req = createLoginRequest({ username: "admin" }, TEST_IPS[0]);
-    const res = await loginHandler(req, {} as RouteContext);
+    const res = await loginHandler(req);
 
     expect(res.status).toBe(400);
     const json = await res.json();
@@ -72,7 +71,7 @@ describe("POST /api/auth/login", () => {
       { username: "admin", password: "wrong" },
       TEST_IPS[1]
     );
-    const res = await loginHandler(req, {} as RouteContext);
+    const res = await loginHandler(req);
 
     expect(res.status).toBe(401);
     const json = await res.json();
@@ -85,7 +84,7 @@ describe("POST /api/auth/login", () => {
       { username: "admin", password: "admin123" },
       TEST_IPS[2]
     );
-    const res = await loginHandler(req, {} as RouteContext);
+    const res = await loginHandler(req);
 
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -110,7 +109,7 @@ describe("POST /api/auth/login", () => {
         { username: "admin", password: "wrong" },
         RATE_LIMIT_IP
       );
-      const res = await loginHandler(req, {} as RouteContext);
+      const res = await loginHandler(req);
       expect(res.status).toBe(401);
     }
 
@@ -118,7 +117,7 @@ describe("POST /api/auth/login", () => {
       { username: "admin", password: "wrong" },
       RATE_LIMIT_IP
     );
-    const blockedRes = await loginHandler(blockedReq, {} as RouteContext);
+    const blockedRes = await loginHandler(blockedReq);
 
     expect(blockedRes.status).toBe(429);
     const json = await blockedRes.json();

@@ -200,6 +200,8 @@ export function StudentList({
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0"
+                      title="编辑班级"
+                      aria-label="编辑班级"
                       onClick={(e) => {
                         e.stopPropagation();
                         onEditClass(classData);
@@ -211,6 +213,8 @@ export function StudentList({
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0"
+                      title="删除班级"
+                      aria-label="删除班级"
                       onClick={(e) => {
                         e.stopPropagation();
                         onDeleteClass(classData.id, classData.name);
@@ -221,7 +225,7 @@ export function StudentList({
                   </div>
                 )}
                 <Badge variant="secondary">{classStudents.length} 人</Badge>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label={isExpanded ? "折叠班级列表" : "展开班级列表"} aria-expanded={isExpanded}>
                   {isExpanded ? (
                     <ChevronUp className="h-5 w-5 text-slate-500" />
                   ) : (

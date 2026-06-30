@@ -4,7 +4,6 @@ import { GET as meHandler } from "../route";
 import { createTestDb } from "@/test/db";
 import { users } from "@/storage/database/shared/schema";
 import { hashPassword, signToken, COOKIE_NAME } from "@/lib/auth";
-import type { RouteContext } from "@/lib/route-handlers/types";
 
 let testDb: Awaited<ReturnType<typeof createTestDb>>;
 
@@ -54,7 +53,7 @@ describe("GET /api/auth/me", () => {
 
   test("未认证返回 401", async () => {
     const req = createMeRequest();
-    const res = await meHandler(req, {} as RouteContext);
+    const res = await meHandler(req);
 
     expect(res.status).toBe(401);
     const json = await res.json();
@@ -65,7 +64,7 @@ describe("GET /api/auth/me", () => {
     await seedAdminUser();
     const token = await signToken({ userId: "u-me", role: "admin" });
     const req = createMeRequest(`${COOKIE_NAME}=${token}`);
-    const res = await meHandler(req, {} as RouteContext);
+    const res = await meHandler(req);
 
     expect(res.status).toBe(200);
     const json = await res.json();

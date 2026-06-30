@@ -4,7 +4,10 @@ import { sanitizeError, sanitizeErrorMessage } from "@/lib/sensitive-mask";
 
 // 统一错误响应格式
 export function apiError(message: string, status: number = 500, code?: string): NextResponse {
-  return errorResponse(message, status, code);
+  // 5xx 错误未显式指定 code 时，自动标记为 INTERNAL_ERROR，
+  // 让客户端能够可靠地区分服务器错误与业务错误
+  const resolvedCode = code ?? (status >= 500 ? "INTERNAL_ERROR" : undefined);
+  return errorResponse(message, status, resolvedCode);
 }
 
 // PostgreSQL 错误码到业务错误码的映射

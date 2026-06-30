@@ -29,12 +29,21 @@
 现有示例：
 
 - `src/app/api/auth/login/__tests__/route.test.ts`
+- `src/app/api/auth/me/__tests__/route.test.ts`
+- `src/app/api/data/clear/__tests__/route.test.ts`
+- `src/app/api/data/reset-admin/__tests__/route.test.ts`
 - `src/lib/repositories/__tests__/user-repository.test.ts`
+- `src/lib/repositories/__tests__/tag-repository.test.ts`
 - `src/lib/services/__tests__/lookup-service.test.ts`
+- `src/lib/services/__tests__/auth-service.test.ts`
+- `src/lib/services/__tests__/feedback-service.test.ts`
+- `src/lib/services/__tests__/stats-service.test.ts`
 - `src/lib/__tests__/rate-limit.test.ts`
 - `src/components/ui/__tests__/button.test.tsx`
 - `e2e/auth.spec.ts`
 - `e2e/home.spec.ts`
+- `e2e/feedback-flow.spec.ts`
+- `e2e/data-management.spec.ts`
 
 ## 运行命令
 
@@ -42,32 +51,70 @@
 # 运行所有 Vitest 测试
 pnpm test
 
-# 查看测试覆盖率（阈值：lines/functions/statements 各 15%，branches 8%）
+# 测试类型检查（独立 tsconfig，包含测试文件）
+pnpm test:typecheck
+
+# 查看测试覆盖率（阈值：lines/functions/statements 各 30%，branches 20%）
 pnpm vitest run --coverage
 
 # 监听模式开发测试
 pnpm vitest
 
-# 运行 Playwright E2E 测试
+# 运行 Playwright E2E 测试（需配置 E2E_ADMIN_USERNAME / E2E_ADMIN_PASSWORD）
 pnpm test:e2e
 ```
 
 ## 编写测试注意事项
 
 - API Route 测试请为每个用例使用独立 IP（通过 `x-forwarded-for`），避免登录接口的 rate limit 计数互相污染。rate limit 已扩展到 AI 生成、数据导入、批量操作等路由，测试这些路由时同样需要注意限流计数。
+- 破坏性操作（如 `data/clear`、`data/reset-admin`）测试请使用不同的 `userId`，避免触发每分钟 2 次的限流。
 - 组件测试默认使用 jsdom 环境，已在 `vitest.config.ts` 中全局配置。
 - 通用初始化逻辑可放在 `src/test/setup.ts`。
+- Service 层测试可使用 PGlite + Proxy mock drizzle-client 模式（参考 `auth-service.test.ts`），无需真实数据库。
+- 纯函数测试（如 mappers、validators）可直接测试，无需 mock。
 
 ## 覆盖率目标与现状
 
-工程质量提升计划已建立测试基础设施与门禁，但当前测试主要集中在 API Route 与部分工具/组件上，Service/Repository 层尚未大规模覆盖：
+工程质量提升计划已建立测试基础设施与门禁，目前已完成 Service 层关键模块的单元测试覆盖：
 
-- 当前全局覆盖率约为 **17%**（lines）。
-- Service/Repository 层覆盖率约为 **2%**，后续需逐步补齐单元测试。
-- 为避免 CI 被不现实的高阈值阻塞，`vitest.config.ts` 中 coverage thresholds 暂设为：
-  - `lines`: **15%**
-  - `functions`: **15%**
-  - `statements`: **15%**
-  - `branches`: **8%**（当前实际约 8.45%，低于 10%，先取整为 8% 避免阻塞）
+- 当前测试总数：**85 个**（含 16 个测试文件）。
+- 覆盖模块：API Route（auth/login、auth/me、data/clear、data/reset-admin）、Service（auth、feedback、stats、lookup）、Repository（user、tag）、工具函数（rate-limit、sensitive-mask、smoke）。
+- `vitest.config.ts` 中 coverage thresholds 已上调至：
+  - `lines`: **30%**
+  - `functions`: **30%**
+  - `statements`: **30%**
+  - `branches`: **20%**
 
-后续随着测试补全，应分阶段上调阈值，最终目标是达到稳定的全局 60% 以上。
+后续随着测试补全，应继续分阶段上调阈值，最终目标是达到稳定的全局 60% 以上。
+
+## 测试待补清单
+
+| 优先级 | 模块 | 待补内容 | 状态 |
+| ------ | ---- | -------- | ---- |
+| 高 | student-service | CRUD + 权限校验 + 转班逻辑 | 待补 |
+| 高 | teacher-service | CRUD + 软删除 + 最后 admin 保护 | 待补 |
+| 高 | class-service | CRUD + 学生关联 | 待补 |
+| 中 | data-repository | importData 事务回滚 + 错误收集 | 待补 |
+| 中 | parse-service | AI 响应解析 + JSON 二次保护 | 待补 |
+| 中 | home-service | enrichStudents + 脱敏 | 待补 |
+| 中 | init-data-service | 事务 + onConflictDoNothing | 待补 |
+| 低 | ai-client | 流式响应 + 错误处理 | 待补 |
+| 低 | pdf-session | 会话管理 + 过期清理 | 待补 |
+| 低 | export-service | 导出格式 + 数据完整性 | 待补 |
+
+## E2E 测试
+
+E2E 测试位于 `e2e/` 目录，使用 Playwright 运行。完整流程测试需要：
+
+1. 可用的数据库连接（`DATABASE_URL`）
+2. 已初始化的 admin 账户（通过 `scripts/init-admin.js` 创建）
+3. 环境变量 `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD`
+
+未配置凭据时，依赖认证的测试会自动跳过（`test.skip`），避免在无数据库环境失败。
+
+CI 中 E2E job 会自动：
+1. 启动 PostgreSQL 服务
+2. 应用数据库迁移
+3. 初始化 admin 账户
+4. 复用 quality job 的构建产物（避免重复 build）
+5. 运行 Playwright 测试
