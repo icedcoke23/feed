@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   COOKIE_NAME,
   signToken,
@@ -7,7 +7,8 @@ import { validateInput } from "@/lib/validations";
 import { enforceRateLimit, getClientIp } from "@/lib/rate-limit";
 import { sanitizeError } from "@/lib/sensitive-mask";
 import { authService } from "@/lib/services";
-import { successResponse } from "@/lib/api-response";
+import { successResponse, errorResponse } from "@/lib/api-response";
+import { apiError } from "@/lib/api-error";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -25,10 +26,7 @@ export async function POST(request: NextRequest) {
 
   // 校验输入
   if (!body || typeof body !== "object" || !("username" in body) || !("password" in body)) {
-    return NextResponse.json(
-      { error: "请求参数错误", code: "VALIDATION_ERROR" },
-      { status: 400 }
-    );
+    return errorResponse("请求参数错误", 400, "VALIDATION_ERROR");
   }
   const result = validateInput(loginSchema, body);
   if ("error" in result) return result.error;
@@ -64,9 +62,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Login error:", sanitizeError(error));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError("登录失败，请稍后重试");
   }
 }
